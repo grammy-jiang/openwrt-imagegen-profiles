@@ -1,24 +1,28 @@
 # openwrt-imagegen-profiles
 
-Curated OpenWrt Image Builder profiles and Python tooling for reproducible, automated firmware builds across multiple devices.
+Opinionated tooling for managing **OpenWrt Image Builder** runs and TF/SD card flashing across many devices, with profiles and builds tracked in a database.
 
-This repository is for people who have **multiple OpenWrt devices** and want a single, automated way to:
+Use this project if you have **multiple OpenWrt devices** and you want to:
 
-- Define how each device’s image should be built.
-- Build those images reproducibly using the official OpenWrt Image Builder.
-- Safely write images to TF/SD cards.
-- Reuse existing images instead of rebuilding when nothing has changed.
+- Describe how each device should be built (target, packages, files) as a reusable profile.
+- Build images reproducibly via the official OpenWrt Image Builder, not custom firmware logic.
+- Reuse cached images when inputs have not changed instead of rebuilding every time.
+- Safely write images to TF/SD cards with verification to catch ghost writes and bad media.
 
-At a high level, the project provides:
+Under the hood, everything is driven by a shared Python library that:
 
-- A **Python orchestration core** that dynamically downloads and caches the official OpenWrt Image Builder.
-- A **database-backed profile and build system** for managing per-device recipes and build history.
-- An **image cache** that avoids unnecessary rebuilds.
-- Multiple frontends over the same logic:
-  - A **CLI** for developers and CI.
-  - A **web interface** for interactive use.
-  - An **MCP server** so AI tools can request builds and flashes programmatically.
+- Dynamically downloads and caches the official OpenWrt Image Builder (keyed by release/target/subtarget).
+- Stores profiles, Image Builder metadata, build records, and artifact paths in a database via an ORM.
+- Maintains an image cache with build-or-reuse semantics keyed by profile + Image Builder + options.
+- Orchestrates safe TF/SD card flashing, including optional wipes and hash-based verification.
 
-The focus is on opinionated, repeatable workflows for a specific set of devices—not on replacing the full OpenWrt SDK.
+Frontends are thin adapters over that library:
 
-For a detailed architecture overview (data model, Image Builder management, artifact tracking, TF card safety), see `ARCHITECTURE.md`.
+- A **CLI** for local use and CI.
+- A **web interface** for interactive control.
+- An **MCP server** so AI tools can request builds, list artifacts, and trigger flashes programmatically.
+
+This project does **not** replace the OpenWrt SDK or Image Builder; it wraps the official tools with higher-level workflows, safety checks, and persistent metadata.
+
+- For the detailed architecture (data model, Image Builder management, artifact tracking, TF card safety), see `ARCHITECTURE.md`.
+- For AI/agent-specific contribution rules and expectations, see `AI_CONTRIBUTING.md` and `.github/copilot-instructions.md`.
