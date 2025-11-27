@@ -1,0 +1,42 @@
+# Example profile: simple home AP in living room
+profile_id: home.ap-livingroom.23.05
+name: Home AP (Living Room, 23.05)
+description: >
+  Main Wi-Fi access point in the living room.
+  OpenWrt 23.05, minimal extras.
+
+device_id: home-ap-livingroom
+tags:
+  - home
+  - ap
+  - wifi
+  - 23.05
+
+openwrt_release: "23.05.2"
+target: ath79
+subtarget: generic
+imagebuilder_profile: tplink_archer-c6-v3
+
+packages:
+  - luci
+  - luci-ssl
+  - htop
+
+packages_remove:
+  - ppp
+  - ppp-mod-pppoe
+
+files:
+  - source: profiles/files/home-ap-livingroom/etc/banner
+    destination: /etc/banner
+    mode: "0644"
+    owner: root:root
+
+policies:
+  filesystem: squashfs
+  include_kernel_symbols: false
+  strip_debug: true
+
+build_defaults:
+  rebuild_if_cached: false
+  initramfs: false

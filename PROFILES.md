@@ -255,8 +255,9 @@ YAML is the primary human-editable export/import format. A profile YAML file cor
 
 ### 3.1 Minimal example (simple AP)
 
+The file `profiles/home-ap-livingroom.yaml` in this repository is a concrete instance of this minimal profile:
+
 ```yaml
-# profiles/home-ap-livingroom.yaml
 profile_id: home.ap-livingroom.23.05
 name: Home AP (Living Room, 23.05)
 description: >
@@ -302,8 +303,9 @@ build_defaults:
 
 ### 3.2 Example with overlay and snapshot policy
 
+The file `profiles/lab-router1-snapshot.yaml` demonstrates overlays and snapshot usage:
+
 ```yaml
-# profiles/lab-router1-snapshot.yaml
 profile_id: lab.router1.snapshot
 name: Lab Router 1 (Snapshot)
 description: |
@@ -351,8 +353,9 @@ notes: >
 
 ### 3.3 Multi-AP fleet with shared pattern
 
-````yaml
-# profiles/home-ap-bedroom.yaml
+The file `profiles/home-ap-bedroom.yaml` shows another AP in the same fleet:
+
+```yaml
 profile_id: home.ap-bedroom.23.05
 name: Home AP (Bedroom, 23.05)
 
@@ -379,13 +382,15 @@ policies:
 
 build_defaults:
   rebuild_if_cached: false
+```
 
 ---
 
 ### 3.4 Example with extended Image Builder options
 
+The file `profiles/lab-router1-extended.yaml` demonstrates use of additional Image Builder options:
+
 ```yaml
-# profiles/lab-router1-extended.yaml
 profile_id: lab.router1.extended
 name: Lab Router 1 (Extended Image Options)
 description: >
@@ -428,9 +433,7 @@ disabled_services:
   - odhcpd
 rootfs_partsize: 256
 add_local_key: true
-````
-
-````
+```
 
 ---
 
@@ -468,7 +471,7 @@ For tools that prefer JSON, the schema is identical, just represented as JSON. E
     "initramfs": false
   }
 }
-````
+```
 
 ---
 

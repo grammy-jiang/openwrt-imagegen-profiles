@@ -1,0 +1,44 @@
+# Example profile: lab router following snapshot builds
+profile_id: lab.router1.snapshot
+name: Lab Router 1 (Snapshot)
+description: |
+  Lab router for testing snapshot builds and experimental packages.
+  Prefer ext4, keep debug symbols.
+
+device_id: lab-router1
+tags:
+  - lab
+  - router
+  - snapshot
+  - debug
+
+openwrt_release: "snapshot"
+target: ramips
+subtarget: mt7621
+imagebuilder_profile: xiaomi_mi-router-4a-gigabit
+
+packages:
+  - luci
+  - tcpdump
+  - iperf3
+  - kmod-usb-storage
+  - block-mount
+
+packages_remove: []
+
+overlay_dir: profiles/overlays/lab-router1
+
+policies:
+  filesystem: ext4
+  include_kernel_symbols: true
+  strip_debug: false
+  allow_snapshot: true
+
+build_defaults:
+  rebuild_if_cached: true
+  initramfs: true
+  keep_build_dir: true
+
+notes: >
+  Used for performance and regression testing.
+  Expect frequent rebuilds and upgrades.

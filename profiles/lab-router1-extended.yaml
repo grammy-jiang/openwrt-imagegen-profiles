@@ -1,0 +1,43 @@
+# Example profile: extended image-builder options
+profile_id: lab.router1.extended
+name: Lab Router 1 (Extended Image Options)
+description: >
+  Example profile demonstrating Image Builder options like BIN_DIR,
+  EXTRA_IMAGE_NAME, DISABLED_SERVICES, and ROOTFS_PARTSIZE.
+
+device_id: lab-router1
+tags: [lab, router, debug, extended]
+
+openwrt_release: "23.05.2"
+target: ramips
+subtarget: mt7621
+imagebuilder_profile: xiaomi_mi-router-4a-gigabit
+
+packages:
+  - luci
+  - nano
+  - openvpn-openssl
+packages_remove:
+  - ppp
+  - ppp-mod-pppoe
+
+overlay_dir: profiles/overlays/lab-router1
+
+policies:
+  filesystem: ext4
+  include_kernel_symbols: true
+  strip_debug: false
+
+build_defaults:
+  rebuild_if_cached: true
+  initramfs: false
+
+# Fields corresponding to Image Builder variables
+bin_dir: /var/tmp/openwrt-images/lab
+extra_image_name: lab-debug
+disabled_services:
+  - dnsmasq
+  - firewall
+  - odhcpd
+rootfs_partsize: 256
+add_local_key: true
