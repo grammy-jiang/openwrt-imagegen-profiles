@@ -25,4 +25,5 @@ Frontends are thin adapters over that library:
 This project does **not** replace the OpenWrt SDK or Image Builder; it wraps the official tools with higher-level workflows, safety checks, and persistent metadata.
 
 - For the detailed architecture (data model, Image Builder management, artifact tracking, TF card safety), see `ARCHITECTURE.md`.
+- For the profile schema and concrete profile examples, see `PROFILES.md`.
 - For AI/agent-specific contribution rules and expectations, see `AI_CONTRIBUTING.md` and `.github/copilot-instructions.md`.

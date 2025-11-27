@@ -1,100 +1,114 @@
 # Copilot Instructions for `openwrt-imagegen-profiles`
 
-These instructions guide AI coding agents working in this repository. They are a **short, operational summary** of `README.md`, `ARCHITECTURE.md`, and `AI_CONTRIBUTING.md`.
+These instructions are the **short, AI-facing version** of `README.md`, `ARCHITECTURE.md`, and `AI_CONTRIBUTING.md`. They explain how to be productive here without fighting the design.
 
-## 1. Big picture (what this repo does)
+## 1. Big picture
 
-- Provide an **AI-friendly orchestration layer** around the official **OpenWrt Image Builder**.
-- Manage **profiles, Image Builder metadata, builds, and artifacts via a database + ORM**.
-- Safely **flash TF/SD cards** from built images.
-- Expose the same core logic through three frontends:
-  - CLI (primary today, CI-friendly).
-  - Web interface (thin GUI).
-  - MCP server (AI tools call into builds/flash).
+- This repo wraps the **official OpenWrt Image Builder** with a Python orchestration layer that manages:
+  - Declarative **device profiles**.
+  - **Builds and artifacts** in a database via an ORM.
+  - Safe **TF/SD card flashing**.
+- Everything flows through a shared Python core; frontends (CLI, web, MCP server) are **thin adapters** over that core.
+- Do **not** re‑implement OpenWrt’s build logic; always shell out to the official Image Builder.
 
-This is **not** a generic OpenWrt SDK; always shell out to the official Image Builder for firmware builds.
+Read next for deeper context:
 
-## 2. Architecture & boundaries
+- `README.md` – project purpose, frontends, and outcomes.
+- `ARCHITECTURE.md` – authoritative design: data model, caching, TF flashing rules.
+- `AI_CONTRIBUTING.md` – strict rules for AI changes (database/ORM, safety, layout).
 
-- Treat **profiles as data, Python as orchestration logic**:
-  - Profiles encode: device ID, OpenWrt release, target/subtarget, Image Builder profile, packages, overlays/policies.
-  - Python code: resolves Image Builder downloads, builds images, tracks artifacts, orchestrates TF card flashing.
-- Database + ORM are the **source of truth** for:
-  - Profiles, Image Builder variants, build records, artifact paths, cache metadata.
-  - YAML/JSON/TOML under `profiles/` are **import/export only**, not authoritative.
-- Frontends (CLI, web, MCP) are **thin wrappers**:
-  - Parse/validate input → call core library → format output.
-  - No build/flash logic in CLI commands, HTTP handlers, or MCP handlers.
+## 2. Architecture & data flow
 
-If you add new behaviors, put them in the core library first, then lightly wire them through frontends.
+- **Profiles are immutable data** (device ID, release, target/subtarget, Image Builder profile name, packages, overlays).
+- The **Python core**:
+  - Resolves/ensures the right Image Builder (downloads + caches by release/target/subtarget).
+  - Composes Image Builder commands from profiles + options.
+  - Runs builds, collects outputs, and records **build records** (inputs, outputs, checksums, logs, status).
+  - Maintains an **image cache**: same inputs ⇒ reuse existing artifacts.
+- **TF card flashing** is a separate safety‑critical layer that:
+  - Only writes to explicit whole‑device paths (e.g. `/dev/sdX`).
+  - Flushes writes and verifies via hash read‑back.
+  - Detects/flags ghost writes or bad cards.
+
+Always keep build and flash behavior in reusable Python modules; CLIs, web handlers, and MCP tools should just call those.
 
 ## 3. Code layout expectations
 
-Even if not all modules exist yet, follow the planned structure from `ARCHITECTURE.md`:
+Even if not all modules exist yet, follow the planned layout from `ARCHITECTURE.md` / `AI_CONTRIBUTING.md`:
 
-- `openwrt_imagegen/`
-  - `imagebuilder/` – download + cache official Image Builder, ORM model for cached builders.
+- `openwrt_imagegen/` (core library)
+  - `imagebuilder/` – download/cache Image Builder; ORM model for cached builders.
   - `profiles/` – ORM models + APIs for profile CRUD and validation.
-  - `builds/` – compose Image Builder commands, run builds, record artifacts + build history, implement image cache.
+  - `builds/` – build orchestration, cache key logic, build records, artifact tracking.
   - `flash/` – TF/SD card flashing workflows and safety checks.
-  - `cli.py` / `__main__.py` – thin CLI entrypoint over the above.
-- `web/` – HTTP handlers that call the same Python APIs (no new business logic).
-- `mcp_server/` – MCP tools that forward to the same Python APIs.
-- `profiles/` – optional on-disk profile exports + schema helpers.
-- `tests/` – mirror the package layout when adding tests.
+  - `cli.py` / `__main__.py` – thin CLI wrapper over these APIs.
+- `web/` – optional web UI; HTTP handlers should only call core APIs.
+- `mcp_server/` – MCP server mapping protocol calls to core APIs one‑for‑one.
+- `profiles/` (top‑level) – optional import/export of profiles (YAML/JSON/TOML) + schema helpers.
+- `tests/` – unit/integration tests mirroring the above structure.
 
-Do not invent new top-level packages for core logic without also updating `ARCHITECTURE.md`.
+If you must introduce a new area of core logic, put it under `openwrt_imagegen/` and update `ARCHITECTURE.md` if you deviate from this structure.
 
-## 4. Core behavioral rules for AI changes
+## 4. Database, profiles, and builds
 
-- **Reproducibility first**
-  - Inputs to a build are: profile + Image Builder version + explicit options. Same inputs must yield same outputs.
-  - Avoid hidden globals ("current device", implicit release); pass explicit context objects/arguments.
-- **Profiles are immutable inputs**
-  - Never mutate profile ORM instances during a build; derive new structures instead.
-  - Changing device behavior means creating/updating a profile, not patching it mid-build.
-- **Centralized command construction**
-  - All Image Builder command lines should be constructed in one place under `openwrt_imagegen/builds/`.
-  - Frontends must not shell out directly.
-- **Image cache via DB**
-  - Before building, check DB-backed cache for an existing artifact with identical effective inputs.
-  - Expose both "build-or-reuse" (idempotent default) and "force rebuild" paths.
+- Treat the **database + ORM as the source of truth** for:
+  - Profiles.
+  - Image Builder variants.
+  - Build records and artifact metadata.
+- Profiles:
+  - Are not mutated during builds; to change behavior, create a new profile or pass explicit options.
+  - Should be queryable by stable ID, release, target, tags, etc.
+  - May have import/export helpers under `profiles/` but runtime logic should read from the ORM.
+- Build records:
+  - Must link to both a profile and an Image Builder record.
+  - Include all inputs (extra packages, overlays, flags) and outputs (paths, checksums, logs).
+  - Power cache decisions (build‑or‑reuse vs force rebuild).
 
-## 5. TF/SD card flashing safety
+When adding/adjusting models or queries, mirror the responsibilities and queries described in `ARCHITECTURE.md` and `AI_CONTRIBUTING.md`.
 
-Any change under `openwrt_imagegen/flash/` must preserve these invariants:
+## 5. TF/SD card flashing rules
 
-- Only operate on **explicit whole-device paths** (e.g. `/dev/sdX`, never `/dev/sdX1`).
-- **No guessing devices** based on size/labels; callers must pass the device path.
-- Provide **dry-run** and explicit **force** flags for destructive operations.
-- Perform pre-flight checks (block device existence, permissions, optional wipe of old signatures).
-- Writes must be **fully flushed** (fsync/sync semantics) before reporting success.
-- Verify by **hashing device contents vs source image** (full or well-documented prefix).
-- Treat mismatched hashes as a failure and log clearly; support marking devices/cards as suspect in metadata/logs.
+Any code that touches block devices must follow these non‑negotiable rules (see `ARCHITECTURE.md` + `AI_CONTRIBUTING.md` for detail):
 
-If a change weakens any of these guarantees, do not make it.
+- Operate on explicit **whole‑device paths only** (e.g. `/dev/sdX`, never `/dev/sdX1`).
+- Never guess devices; require the caller to provide the path and use explicit `--force` or similar for destructive actions.
+- Perform pre‑flight checks (block device detection; optional signature wipe/zero‑fill when requested).
+- Write synchronously and flush caches (equivalent to `dd ... conv=fsync` + `sync`).
+- Verify writes with hash comparison of image vs device (full image or well‑documented prefix).
+- Log operations in detail and surface errors clearly; treat hash mismatches as failures.
 
-## 6. Developer workflows to align with
+If a proposed change makes flashing less safe or less observable, do not make that change.
 
-When adding scripts, CLIs, or MCP/web endpoints, model them on these flows:
+## 6. Frontend behavior (CLI, web, MCP)
 
-- **Build image for a profile**
-  - Input: profile ID (or definition) + options.
-  - Steps: ensure Image Builder (download/cache) → compute cache key → build-or-reuse → store build record + artifacts in a structured tree (e.g. `builds/<device>/<release>/build-<timestamp>/`).
-- **List and inspect builds**
-  - Query DB for latest successful build(s) by profile, release, or Image Builder variant.
-  - Return paths, checksums, and status for use by CI or MCP clients.
-- **Flash TF card**
-  - Input: explicit image path or build ID + explicit device path.
-  - Steps: pre-flight checks → optional wipe → write with flush → hash-verify → log and return rich metadata.
+- Keep all three frontends **thin**:
+  - CLI: argument parsing, calling core functions, printing text/JSON, clear exit codes.
+  - Web: HTTP routing + auth/validation + mapping to core APIs.
+  - MCP: idempotent, cache‑aware operations that map 1:1 to core APIs and return structured metadata.
+- Do not add build/flash logic directly into CLI commands, HTTP handlers, or MCP handlers.
 
-Design CLIs and MCP endpoints so they can run **non-interactively** with well-defined exit codes and optional JSON output.
+When extending a workflow, first add/extend a core function under `openwrt_imagegen/`, then wire it through the relevant frontend.
 
-## 7. How AI agents should work here
+## 7. Testing & workflows
 
-- Before adding new behavior, skim `README.md`, `ARCHITECTURE.md`, and `AI_CONTRIBUTING.md` to mirror existing patterns.
-- Keep public APIs stable; if you must change a function/CLI signature, update all call sites and adjust docs/tests in the same PR.
-- Prefer clear, composable Python APIs (e.g. `build_or_reuse_image(profile_id, options)`, `flash_device(image_path, device, *, dry_run, force)`) over ad-hoc scripts.
-- When in doubt, favor **clarity, reproducibility, and safety** over cleverness or convenience.
+- Non‑trivial changes to core logic should come with or update tests under `tests/` (e.g. `pytest`).
+- Core scenarios to cover:
+  - Profile validation and lookup.
+  - Image Builder selection/caching.
+  - Build record creation and cache hit detection.
+  - Flashing logic with mocked block devices and checksum verification.
+- Tests must not depend on real TF cards or the network; use mocking/fakes around Image Builder and devices.
 
-If repository reality ever diverges from these instructions, follow the actual code and update this file to match.
+For examples of intended behavior and queries, rely on the narrative in `ARCHITECTURE.md` and rules in `AI_CONTRIBUTING.md` when designing tests.
+
+## 8. How AI agents should operate
+
+- Before writing new functionality, skim `README.md`, `ARCHITECTURE.md`, and `AI_CONTRIBUTING.md` to align with the existing design.
+- Prefer:
+  - Extending the core library first.
+  - Adding/adjusting tests.
+  - Keeping frontends as thin wiring layers.
+- When naming things or structuring directories, favor explicit, reproducible patterns (e.g. `device_id/release/build-<timestamp>` for output trees) over opaque IDs.
+- If documentation and code disagree, treat the **current code** as authoritative and update docs (including this file) to match.
+
+When unsure, default to reproducibility, safety (especially for TF/SD flashing), and thin, well‑typed Python APIs.

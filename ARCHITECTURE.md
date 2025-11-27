@@ -218,7 +218,7 @@ Several principles guide the overall design and should be preserved when extendi
 
 ---
 
-For a quick, human- and AI-oriented summary of the project purpose and outcomes, see `README.md`. For detailed component-level behavior and extension guidelines, this `ARCHITECTURE.md` is the primary reference.
+For a quick, human- and AI-oriented summary of the project purpose and outcomes, see `README.md`. For detailed component-level behavior and extension guidelines, this `ARCHITECTURE.md` is the primary reference. For the concrete profile schema and examples used by the profile management layer, see `PROFILES.md`.
 
 ---
 
