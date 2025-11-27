@@ -1,114 +1,89 @@
 # Copilot Instructions for `openwrt-imagegen-profiles`
 
-These instructions are the **short, AI-facing version** of `README.md`, `ARCHITECTURE.md`, and `AI_CONTRIBUTING.md`. They explain how to be productive here without fighting the design.
+These instructions guide AI coding agents working in this repository. Focus on repeatable OpenWrt Image Builder workflows and Python tooling around them.
 
-## 1. Big picture
+## 1. Big-picture architecture
 
-- This repo wraps the **official OpenWrt Image Builder** with a Python orchestration layer that manages:
-  - Declarative **device profiles**.
-  - **Builds and artifacts** in a database via an ORM.
-  - Safe **TF/SD card flashing**.
-- Everything flows through a shared Python core; frontends (CLI, web, MCP server) are **thin adapters** over that core.
-- Do **not** re‑implement OpenWrt’s build logic; always shell out to the official Image Builder.
+- This repo is about **declarative device profiles** + **Python orchestration** around the official **OpenWrt Image Builder**, _not_ a generic OpenWrt SDK.
+- Treat **profiles as data, Python as logic**:
+  - Profiles encode targets, subtargets, Image Builder profile names, releases, packages, and optional overlays.
+  - Python code is responsible for reading profiles, composing Image Builder CLI invocations, collecting artifacts, and logging.
+- Expect a future split between:
+  - A **Python CLI layer** (for local/CI usage).
+  - An optional **service/MCP layer** that calls the same Python functions without duplicating business logic.
 
-Read next for deeper context:
+When in doubt, keep build/flash behavior in reusable Python modules and let CLIs/services be thin wrappers.
 
-- `README.md` – project purpose, frontends, and outcomes.
-- `ARCHITECTURE.md` – authoritative design: data model, caching, TF flashing rules.
-- `AI_CONTRIBUTING.md` – strict rules for AI changes (database/ORM, safety, layout).
+## 2. Conventions and design principles
 
-## 2. Architecture & data flow
+- **Reproducibility first**
+  - Prefer explicit parameters (target, profile, release, packages) over implicit defaults or environment-dependent behavior.
+  - Avoid hidden state such as global config files or "current device" globals; pass explicit context objects or arguments.
+- **Profiles are immutable inputs**
+  - Do not mutate loaded profile objects in-place while building; derive new structures instead.
+  - Treat a profile as a snapshot that should deterministically yield the same build outputs.
+- **Separation of concerns**
+  - Parsing/validating profile data is separate from executing Image Builder commands.
+  - TF card flashing logic is separate from build logic but can share common types (e.g., image metadata, device identifiers).
+- **Safety over convenience**
+  - Any code that touches block devices (TF cards, disks) must:
+    - Require explicit device paths.
+    - Prefer dry-run and confirmation modes.
+    - Log what will be done before doing it.
 
-- **Profiles are immutable data** (device ID, release, target/subtarget, Image Builder profile name, packages, overlays).
-- The **Python core**:
-  - Resolves/ensures the right Image Builder (downloads + caches by release/target/subtarget).
-  - Composes Image Builder commands from profiles + options.
-  - Runs builds, collects outputs, and records **build records** (inputs, outputs, checksums, logs, status).
-  - Maintains an **image cache**: same inputs ⇒ reuse existing artifacts.
-- **TF card flashing** is a separate safety‑critical layer that:
-  - Only writes to explicit whole‑device paths (e.g. `/dev/sdX`).
-  - Flushes writes and verifies via hash read‑back.
-  - Detects/flags ghost writes or bad cards.
+## 3. Project layout expectations
 
-Always keep build and flash behavior in reusable Python modules; CLIs, web handlers, and MCP tools should just call those.
+Even if some modules are not created yet, follow these patterns:
 
-## 3. Code layout expectations
+- `profiles/` (or similar future dir):
+  - Data-only definitions for devices (YAML/JSON/TOML).
+  - Keep schemas consistent; add validation helpers when patterns emerge.
+- `imagegen/` or `openwrt_imagegen/` (Python package):
+  - Core orchestration code for:
+    - Loading/validating profiles.
+    - Constructing Image Builder commands.
+    - Running builds and collecting artifacts/logs.
+- `cli.py` or `__main__.py`:
+  - Thin argparse/Typer/Click wrapper around the orchestration library.
 
-Even if not all modules exist yet, follow the planned layout from `ARCHITECTURE.md` / `AI_CONTRIBUTING.md`:
+If you introduce new modules, align them with this separation and keep UX-focused code (argument parsing, prompts) out of the core.
 
-- `openwrt_imagegen/` (core library)
-  - `imagebuilder/` – download/cache Image Builder; ORM model for cached builders.
-  - `profiles/` – ORM models + APIs for profile CRUD and validation.
-  - `builds/` – build orchestration, cache key logic, build records, artifact tracking.
-  - `flash/` – TF/SD card flashing workflows and safety checks.
-  - `cli.py` / `__main__.py` – thin CLI wrapper over these APIs.
-- `web/` – optional web UI; HTTP handlers should only call core APIs.
-- `mcp_server/` – MCP server mapping protocol calls to core APIs one‑for‑one.
-- `profiles/` (top‑level) – optional import/export of profiles (YAML/JSON/TOML) + schema helpers.
-- `tests/` – unit/integration tests mirroring the above structure.
+## 4. External tools and integration points
 
-If you must introduce a new area of core logic, put it under `openwrt_imagegen/` and update `ARCHITECTURE.md` if you deviate from this structure.
+- **OpenWrt Image Builder** is the authoritative build engine:
+  - Never reimplement package selection or firmware construction logic; always shell out to the official tool.
+  - Centralize command construction in one place so changes to Image Builder flags are easy to maintain.
+- **CI / automation**
+  - Design functions so they can be called non-interactively (no prompts, deterministic exits).
+  - Prefer explicit output directories and log paths that CI can collect as artifacts.
+- **Future MCP/service wrappers**
+  - Expose idempotent, side-effect-controlled functions (e.g., `build_image(profile, options)`, `flash_tf_card(image, device)`).
+  - Ensure return types include enough metadata (paths, checksums, logs) for higher layers to reason about state.
 
-## 4. Database, profiles, and builds
+## 5. Developer workflows (expected)
 
-- Treat the **database + ORM as the source of truth** for:
-  - Profiles.
-  - Image Builder variants.
-  - Build records and artifact metadata.
-- Profiles:
-  - Are not mutated during builds; to change behavior, create a new profile or pass explicit options.
-  - Should be queryable by stable ID, release, target, tags, etc.
-  - May have import/export helpers under `profiles/` but runtime logic should read from the ORM.
-- Build records:
-  - Must link to both a profile and an Image Builder record.
-  - Include all inputs (extra packages, overlays, flags) and outputs (paths, checksums, logs).
-  - Power cache decisions (build‑or‑reuse vs force rebuild).
+When adding scripts or docs, align with these workflows:
 
-When adding/adjusting models or queries, mirror the responsibilities and queries described in `ARCHITECTURE.md` and `AI_CONTRIBUTING.md`.
+- **Build**
+  - Input: device profile ID or file path.
+  - Steps: load profile → validate → ensure Image Builder present → run build → collect images + logs into a predictable output tree (e.g., `builds/<device>/<release>/...`).
+- **Flash TF card (planned)**
+  - Input: built image + explicit block device path.
+  - Steps: verify image exists and matches device → optional dry-run/confirmation → write image → verify (e.g., checksum/read-back) → log operations.
 
-## 5. TF/SD card flashing rules
+Document any non-obvious environment variables or paths near where they are used.
 
-Any code that touches block devices must follow these non‑negotiable rules (see `ARCHITECTURE.md` + `AI_CONTRIBUTING.md` for detail):
+## 6. Coding style and quality
 
-- Operate on explicit **whole‑device paths only** (e.g. `/dev/sdX`, never `/dev/sdX1`).
-- Never guess devices; require the caller to provide the path and use explicit `--force` or similar for destructive actions.
-- Perform pre‑flight checks (block device detection; optional signature wipe/zero‑fill when requested).
-- Write synchronously and flush caches (equivalent to `dd ... conv=fsync` + `sync`).
-- Verify writes with hash comparison of image vs device (full image or well‑documented prefix).
-- Log operations in detail and surface errors clearly; treat hash mismatches as failures.
+- Use modern Python (3.10+) syntax and type hints where practical.
+- Prefer small, testable functions with explicit parameters over large scripts.
+- When adding new behaviors, add or update **self-checks or tests** alongside them (e.g., pytest-style tests or simple regression scripts in `tests/`).
 
-If a proposed change makes flashing less safe or less observable, do not make that change.
+## 7. How AI agents should work here
 
-## 6. Frontend behavior (CLI, web, MCP)
+- Before generating new functionality, scan `README.md` and existing Python modules for how profiles and builds are modeled; copy existing patterns instead of inventing new ones.
+- When unsure about a behavior (e.g., how to structure directories, how to name profiles), defer to clarity and reproducibility:
+  - E.g., prefer `device_id/release/build-<timestamp>`-style paths to opaque hashes.
+- Keep public interfaces stable: if you must change a function or CLI signature, update all call sites and, if present, docs/tests in the same change.
 
-- Keep all three frontends **thin**:
-  - CLI: argument parsing, calling core functions, printing text/JSON, clear exit codes.
-  - Web: HTTP routing + auth/validation + mapping to core APIs.
-  - MCP: idempotent, cache‑aware operations that map 1:1 to core APIs and return structured metadata.
-- Do not add build/flash logic directly into CLI commands, HTTP handlers, or MCP handlers.
-
-When extending a workflow, first add/extend a core function under `openwrt_imagegen/`, then wire it through the relevant frontend.
-
-## 7. Testing & workflows
-
-- Non‑trivial changes to core logic should come with or update tests under `tests/` (e.g. `pytest`).
-- Core scenarios to cover:
-  - Profile validation and lookup.
-  - Image Builder selection/caching.
-  - Build record creation and cache hit detection.
-  - Flashing logic with mocked block devices and checksum verification.
-- Tests must not depend on real TF cards or the network; use mocking/fakes around Image Builder and devices.
-
-For examples of intended behavior and queries, rely on the narrative in `ARCHITECTURE.md` and rules in `AI_CONTRIBUTING.md` when designing tests.
-
-## 8. How AI agents should operate
-
-- Before writing new functionality, skim `README.md`, `ARCHITECTURE.md`, and `AI_CONTRIBUTING.md` to align with the existing design.
-- Prefer:
-  - Extending the core library first.
-  - Adding/adjusting tests.
-  - Keeping frontends as thin wiring layers.
-- When naming things or structuring directories, favor explicit, reproducible patterns (e.g. `device_id/release/build-<timestamp>` for output trees) over opaque IDs.
-- If documentation and code disagree, treat the **current code** as authoritative and update docs (including this file) to match.
-
-When unsure, default to reproducibility, safety (especially for TF/SD flashing), and thin, well‑typed Python APIs.
+If anything in these instructions seems to conflict with the current code, follow the actual code and update this file to match reality rather than enforcing an outdated convention.
