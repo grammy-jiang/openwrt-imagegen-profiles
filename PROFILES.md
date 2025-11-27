@@ -27,6 +27,8 @@ Core concepts:
 - **Policies** – portable knobs for build behavior (e.g. strip debug, include kernel symbols, filesystem preference).
 - **Metadata** – human-friendly tags, comments, and internal bookkeeping.
 
+Image Builder itself exposes a small set of variables (for example `PROFILE`, `PACKAGES`, `FILES`, `BIN_DIR`, `EXTRA_IMAGE_NAME`, `DISABLED_SERVICES`, `ROOTFS_PARTSIZE`, `ADD_LOCAL_KEY`) that control how images are built. Profiles do not expose these low-level variables directly; instead, they use higher-level fields which the Python build library translates into the appropriate Image Builder variables.
+
 ---
 
 ## 2. Top-level profile fields
@@ -98,7 +100,8 @@ Profiles control both **additional packages** and optionally packages to **remov
 Notes:
 
 - Exact package names must be valid for the selected Image Builder.
-- The build library is responsible for turning these lists into the `PACKAGES` argument for Image Builder.
+- The build library is responsible for turning these lists into the `PACKAGES` argument for Image Builder. Includes from `packages` are passed as-is; excludes from `packages_remove` are prefixed with `-` (for example `-ppp -ppp-mod-pppoe`) to match Image Builder semantics.
+- Dependencies do not need to be listed explicitly; the Image Builder uses `opkg` to resolve them. As in the upstream documentation, ABI-versioned packages (for example names like `libubus20191227`) should generally be omitted from profiles and allowed to be pulled in via dependencies instead.
 
 ### 2.4 Files and overlays
 
@@ -142,7 +145,7 @@ Profiles can specify additional **files** to be overlaid into the image filesyst
 
 Implementation detail:
 
-- On disk, `files` and `overlay_dir` can be used in combination; the build library is responsible for constructing the appropriate `files/` tree or passing `FILES=` to Image Builder.
+- On disk, `files` and `overlay_dir` can be used in combination; the build library is responsible for constructing a single overlay directory tree and passing it via the `FILES` variable to Image Builder. This directory is typically placed in the Image Builder root or a temporary location and referenced as `FILES="<resolved-path>"` when running `make image`.
 
 ### 2.5 Policies and build options
 
@@ -196,6 +199,35 @@ These influence **build requests** that do not explicitly override them.
     - Hint for whether to keep intermediate build directories.
 
 Frontends may expose these as CLI flags or web options with sensible overrides.
+
+### 2.8 Image Builder options
+
+These fields describe defaults for how the orchestrator calls the underlying OpenWrt Image Builder. They are translated into the official Image Builder variables described in the upstream documentation.
+
+- `bin_dir` (string, optional)
+
+  - Maps to the Image Builder `BIN_DIR` make variable.
+  - If set, the orchestrator will pass `BIN_DIR="<path>"` to `make image` (and related commands) so images are written to that directory instead of the default `bin/targets/...` tree inside the Image Builder.
+
+- `extra_image_name` (string, optional)
+
+  - Maps to `EXTRA_IMAGE_NAME`.
+  - This string is appended (after Image Builder sanitizes it) to output image filenames, making it easy to distinguish variants such as `lab-debug` vs `prod`.
+
+- `disabled_services` (list of strings, optional)
+
+  - Maps to `DISABLED_SERVICES`.
+  - Each entry is the name of a service in `/etc/init.d/` that should be disabled in the generated image (for example `dnsmasq`, `firewall`, `odhcpd`).
+
+- `rootfs_partsize` (integer, optional)
+
+  - Maps to `ROOTFS_PARTSIZE` (specified in megabytes).
+  - Overrides the default rootfs partition size if the target supports it.
+
+- `add_local_key` (bool, optional)
+
+  - Maps to `ADD_LOCAL_KEY`.
+  - When `true`, the orchestrator will pass `ADD_LOCAL_KEY=1` so a locally generated signing key is stored in built images, mirroring the upstream `make help` behavior.
 
 ### 2.7 Profile provenance / metadata
 
@@ -319,7 +351,7 @@ notes: >
 
 ### 3.3 Multi-AP fleet with shared pattern
 
-```yaml
+````yaml
 # profiles/home-ap-bedroom.yaml
 profile_id: home.ap-bedroom.23.05
 name: Home AP (Bedroom, 23.05)
@@ -347,7 +379,58 @@ policies:
 
 build_defaults:
   rebuild_if_cached: false
-```
+
+---
+
+### 3.4 Example with extended Image Builder options
+
+```yaml
+# profiles/lab-router1-extended.yaml
+profile_id: lab.router1.extended
+name: Lab Router 1 (Extended Image Options)
+description: >
+  Example profile demonstrating Image Builder options like BIN_DIR,
+  EXTRA_IMAGE_NAME, DISABLED_SERVICES, and ROOTFS_PARTSIZE.
+
+device_id: lab-router1
+tags: [lab, router, debug, extended]
+
+openwrt_release: "23.05.2"
+target: ramips
+subtarget: mt7621
+imagebuilder_profile: xiaomi_mi-router-4a-gigabit
+
+packages:
+  - luci
+  - nano
+  - openvpn-openssl
+packages_remove:
+  - ppp
+  - ppp-mod-pppoe
+
+overlay_dir: profiles/overlays/lab-router1
+
+policies:
+  filesystem: ext4
+  include_kernel_symbols: true
+  strip_debug: false
+
+build_defaults:
+  rebuild_if_cached: true
+  initramfs: false
+
+# Fields corresponding to Image Builder variables
+bin_dir: /var/tmp/openwrt-images/lab
+extra_image_name: lab-debug
+disabled_services:
+  - dnsmasq
+  - firewall
+  - odhcpd
+rootfs_partsize: 256
+add_local_key: true
+````
+
+````
 
 ---
 
@@ -385,7 +468,7 @@ For tools that prefer JSON, the schema is identical, just represented as JSON. E
     "initramfs": false
   }
 }
-```
+````
 
 ---
 
@@ -463,6 +546,31 @@ When calling the build library (e.g. `build_or_reuse(profile_id, options)`):
   - Ensures the Image Builder archive is present (using the imagebuilder module).
   - Computes a cache key from `profile snapshot + Image Builder + options`.
   - Either reuses an existing artifact or performs a new build.
+
+Conceptually, for a given profile the build library maps profile fields to the official Image Builder variables as follows:
+
+- `imagebuilder_profile` → `PROFILE="<profile-name>"` (as listed by `make info`).
+- `packages` + `packages_remove` → `PACKAGES="pkg1 pkg2 -pkg3 …"`.
+- `files` + `overlay_dir` → `FILES="<resolved overlay dir>"`.
+- `bin_dir` → `BIN_DIR="<path>"` (optional).
+- `extra_image_name` → `EXTRA_IMAGE_NAME="<string>"` (optional).
+- `disabled_services` → `DISABLED_SERVICES="svc1 svc2 …"` (optional).
+- `rootfs_partsize` → `ROOTFS_PARTSIZE="<size-in-MB>"` (optional).
+- `add_local_key` → `ADD_LOCAL_KEY=1` when enabled.
+
+For example, a build for the `lab.router1.extended` profile above might translate into a call similar to:
+
+```sh
+make image \
+  PROFILE="xiaomi_mi-router-4a-gigabit" \
+  PACKAGES="luci nano openvpn-openssl -ppp -ppp-mod-pppoe" \
+  FILES="<resolved overlay dir>" \
+  BIN_DIR="/var/tmp/openwrt-images/lab" \
+  EXTRA_IMAGE_NAME="lab-debug" \
+  DISABLED_SERVICES="dnsmasq firewall odhcpd" \
+  ROOTFS_PARTSIZE="256" \
+  ADD_LOCAL_KEY=1
+```
 
 Profiles themselves are **not** mutated by builds; build results live in separate build records referencing the profile.
 
