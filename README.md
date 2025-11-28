@@ -19,10 +19,42 @@ Under the hood, everything is driven by a shared Python library that:
 Frontends are thin adapters over that library:
 
 - A **CLI** for local use and CI.
-- A **web interface** for interactive control.
-- An **MCP server** so AI tools can request builds, list artifacts, and trigger flashes programmatically.
+- A **web interface** for interactive control (planned).
+- An **MCP server** so AI tools can request builds, list artifacts, and trigger flashes programmatically (planned).
 
 This project does **not** replace the OpenWrt SDK or Image Builder; it wraps the official tools with higher-level workflows, safety checks, and persistent metadata.
+
+## Quick start
+
+```bash
+# Create and activate a virtual environment
+uv venv .venv
+source .venv/bin/activate
+
+# Install with development dependencies
+uv pip install -e .[dev]
+
+# Verify the CLI works
+python -m openwrt_imagegen --help
+python -m openwrt_imagegen --version
+python -m openwrt_imagegen config --json
+```
+
+## Development
+
+See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for the full development guide.
+
+```bash
+# Run linting and type checks
+uv run ruff check
+uv run ruff format --check
+uv run mypy openwrt_imagegen
+
+# Run tests with coverage
+uv run pytest --cov --cov-report=term-missing
+```
+
+## Documentation
 
 - For the detailed architecture (data model, Image Builder management, artifact tracking, TF card safety), see [ARCHITECTURE.md](docs/ARCHITECTURE.md).
 - For the profile schema and concrete profile examples, see [PROFILES.md](docs/PROFILES.md).
