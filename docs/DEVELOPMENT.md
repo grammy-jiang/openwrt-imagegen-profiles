@@ -16,6 +16,56 @@ This repository is currently design-heavy: the core Python package has not been 
 - Plan CI to mirror local commands (`pip install -e .[dev]`, `pytest`, `ruff check` / `black --check`).
 - Update `README.md` and `../.github/copilot-instructions.md` when commands become real.
 
+## 3) Suggested implementation route
+
+1. **Scaffold**  
+   - Add `pyproject.toml` with core + dev extras (per Section 3), `src` layout or flat package root, `uv.lock`, and basic tool configs (ruff, mypy, pytest).
+   - Create `openwrt_imagegen/` skeleton (subpackages + `types.py`) and `tests/` with a CLI smoke test.
+   - Add CI (GitHub Actions) to run ruff, mypy, pytest with coverage on pushes/PRs.
+
+2. **Config + logging foundation**  
+   - Implement `config.py` (pydantic Settings) with paths, concurrency, offline mode, verification mode; expose `print-config` in CLI.
+   - Set up logging config helper to emit structured logs; include request IDs.
+
+3. **ORM models + DB plumbing**  
+   - Define models in `profiles/models.py`, `imagebuilder/models.py`, `builds/models.py`, optional `flash/models.py`; integrate SQLAlchemy session management.
+   - Add Alembic with initial migration; add tests for model creation and basic CRUD.
+
+4. **Profile validation + import/export**  
+   - Implement `profiles/schema.py` (Pydantic), `profiles/io.py`, `profiles/service.py` for CRUD/query/import/export; tests for validation and bulk import/export reporting.
+
+5. **Image Builder management**  
+   - Implement URL discovery, download with checksum/signature verification, extraction, and metadata updates; locking for downloads.  
+   - Tests with mocked HTTP and temp dirs; ensure cache metadata persisted.
+
+6. **Build orchestration**  
+   - Implement cache-key computation (`builds/cache_key.py`), overlay staging/hashing (`builds/overlay.py`), runner (`builds/runner.py`), artifact discovery/manifests (`builds/artifacts.py`), and `build_or_reuse` in `builds/service.py` with locking/concurrency.  
+   - Tests using fakes/mocks for subprocess and filesystem.
+
+7. **Batch builds**  
+   - Implement `build_batch` with filter resolution, per-profile results, fail-fast vs best-effort modes; respect concurrency limits.  
+   - Tests for mixed cache hits/misses and failure aggregation.
+
+8. **Flashing workflows**  
+   - Implement device validation (`flash/device.py`), writer (`flash/writer.py`), service (`flash/service.py`) with dry-run/force/wipe/verify; optional FlashRecord persistence.  
+   - Tests using temp files as fake devices; hash verification logic.
+
+9. **CLI**  
+   - Implement Typer-based CLI mapping to services (profiles, builders, builds, batch, artifacts, flash); support `--json`, exit codes per `OPERATIONS.md`, and config printing.  
+   - Tests for argument parsing and JSON outputs.
+
+10. **Web API**  
+    - Build FastAPI app exposing endpoints per `FRONTENDS.md` (profiles, builders, builds, batch, artifacts, flash); reuse core services and schemas; enable polling endpoints for status/logs.  
+    - Tests with TestClient for happy/error paths.
+
+11. **MCP server**  
+    - Implement Starlette/FastAPI MCP tools (`list_profiles`, `build_image`, `build_images_batch`, `list_builds`, `list_artifacts`, `flash_artifact`); ensure idempotency, structured errors, and log path exposure.  
+    - Tests for tool behaviors and error codes.
+
+12. **Docs & polish**  
+    - Update `README.md`, `docs/DEVELOPMENT.md`, `.github/copilot-instructions.md` with actual commands and status.  
+    - Add `CHANGELOG.md` and package markers (`py.typed`) when publishing.
+
 ## 3) Dependency stack (planned)
 Group dependencies in `pyproject.toml` via uv/PEP 621 optional dependency groups, with a single choice per concern:
 
