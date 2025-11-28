@@ -1,31 +1,32 @@
 # Development Guide
 
-This repository is currently design-heavy: the core Python package has not been implemented yet. Use this guide as the single place for day-to-day engineering info: bootstrap, style, configuration defaults, testing expectations, and working practices.
+This repository provides an opinionated Python library for managing OpenWrt Image Builder workflows. Use this guide as the single place for day-to-day engineering info: bootstrap, style, configuration defaults, testing expectations, and working practices.
 
 ## 1) Status and layout
-- Code status: design docs + profile examples only; no `openwrt_imagegen/` package or tests yet.
+- Code status: **package skeleton implemented** with CLI stub, config, types, and smoke tests.
+- Package structure: `openwrt_imagegen/imagebuilder/`, `openwrt_imagegen/profiles/`, `openwrt_imagegen/builds/`, `openwrt_imagegen/flash/`, `openwrt_imagegen/config.py`, `openwrt_imagegen/types.py`, and thin CLI in `openwrt_imagegen/cli.py`.
+- Tests: `tests/` with CLI smoke tests, config tests, and types tests.
 - Key design references: [README.md](../README.md), [ARCHITECTURE.md](ARCHITECTURE.md), [PROFILES.md](PROFILES.md), [BUILD_PIPELINE.md](BUILD_PIPELINE.md), [SAFETY.md](SAFETY.md), [DB_MODELS.md](DB_MODELS.md), [FRONTENDS.md](FRONTENDS.md), [AI_CONTRIBUTING.md](AI_CONTRIBUTING.md), [AI_WORKFLOW.md](AI_WORKFLOW.md), and [Copilot instructions](../.github/copilot-instructions.md).
-- Planned package structure (when created): `openwrt_imagegen/imagebuilder/`, `openwrt_imagegen/profiles/`, `openwrt_imagegen/builds/`, `openwrt_imagegen/flash/`, and a thin CLI entry point.
 
-## 2) Bootstrap checklist (first runnable skeleton)
-- Create `pyproject.toml` (Python >=3.10) with minimal deps; keep dev deps (e.g., `pytest`) separated.
-- Create the package skeleton: `openwrt_imagegen/__init__.py` plus empty subpackages for imagebuilder, profiles, builds, flash, and a shared `types.py`.
-- Add a minimal CLI: `python -m openwrt_imagegen --help` should work offline, return 0, and expose `--version`.
-- Add smoke tests under `tests/` (e.g., CLI `--help`); include `pytest` config.
-- Add tooling config in `pyproject.toml` for lint/format (ruff/black if adopted).
-- Plan CI to mirror local commands (`pip install -e .[dev]`, `pytest`, `ruff check` / `black --check`).
-- Update `README.md` and `../.github/copilot-instructions.md` when commands become real.
+## 2) Bootstrap checklist (completed)
+- [x] Create `pyproject.toml` (Python >=3.10) with minimal deps; keep dev deps separated.
+- [x] Create the package skeleton: `openwrt_imagegen/__init__.py` plus empty subpackages for imagebuilder, profiles, builds, flash, and a shared `types.py`.
+- [x] Add a minimal CLI: `python -m openwrt_imagegen --help` works offline, returns 0, and exposes `--version`.
+- [x] Add smoke tests under `tests/` (e.g., CLI `--help`); include `pytest` config.
+- [x] Add tooling config in `pyproject.toml` for lint/format (ruff).
+- [x] Add `py.typed` marker for typed package.
+- [ ] Add CI (GitHub Actions) to run ruff, mypy, pytest with coverage on pushes/PRs.
 
 ## 3) Suggested implementation route
 
-1. **Scaffold**  
-   - Add `pyproject.toml` with core + dev extras (per Section 3), `src` layout or flat package root, `uv.lock`, and basic tool configs (ruff, mypy, pytest).
-   - Create `openwrt_imagegen/` skeleton (subpackages + `types.py`) and `tests/` with a CLI smoke test.
-   - Add CI (GitHub Actions) to run ruff, mypy, pytest with coverage on pushes/PRs.
+1. **Scaffold** ✅ (completed)
+   - Added `pyproject.toml` with core + dev extras, `uv.lock`, and basic tool configs (ruff, mypy, pytest).
+   - Created `openwrt_imagegen/` skeleton (subpackages + `types.py`) and `tests/` with CLI smoke tests.
+   - Remaining: Add CI (GitHub Actions) to run ruff, mypy, pytest with coverage on pushes/PRs.
 
-2. **Config + logging foundation**  
-   - Implement `config.py` (pydantic Settings) with paths, concurrency, offline mode, verification mode; expose `print-config` in CLI.
-   - Set up logging config helper to emit structured logs; include request IDs.
+2. **Config + logging foundation** ✅ (partially completed)
+   - Implemented `config.py` (pydantic Settings) with paths, concurrency, offline mode, verification mode; exposed `config` command in CLI.
+   - Remaining: Set up logging config helper to emit structured logs; include request IDs.
 
 3. **ORM models + DB plumbing**  
    - Define models in `profiles/models.py`, `imagebuilder/models.py`, `builds/models.py`, optional `flash/models.py`; integrate SQLAlchemy session management.
@@ -66,7 +67,7 @@ This repository is currently design-heavy: the core Python package has not been 
     - Update `README.md`, `docs/DEVELOPMENT.md`, `.github/copilot-instructions.md` with actual commands and status.  
     - Add `CHANGELOG.md` and package markers (`py.typed`) when publishing.
 
-## 3) Dependency stack (planned)
+## 4) Dependency stack (implemented)
 Group dependencies in `pyproject.toml` via uv/PEP 621 optional dependency groups, with a single choice per concern:
 
 - **Core runtime**
@@ -96,7 +97,7 @@ Group dependencies in `pyproject.toml` via uv/PEP 621 optional dependency groups
 
 Keep the default install minimal (core runtime only). Use extras like `[dev]`, `[web]`, `[postgres]`, `[ops]` to keep optional features opt-in.
 
-## 4) Common uv commands (planned once `pyproject.toml` and package exist)
+## 5) Common uv commands
 - Create venv:
   ```
   uv venv .venv
@@ -125,7 +126,6 @@ Keep the default install minimal (core runtime only). Use extras like `[dev]`, `
   ```
   uv run ruff format --check
   ```
-  (or `uv run black --check` if adopted)
 - Tests:
   ```
   uv run pytest
@@ -138,7 +138,7 @@ Keep the default install minimal (core runtime only). Use extras like `[dev]`, `
   ```
   uv run tox -e lint,test,coverage
   ```
-- CLI smoke (once implemented):
+- CLI smoke:
   ```
   uv run python -m openwrt_imagegen --help
   ```
@@ -148,7 +148,7 @@ Keep the default install minimal (core runtime only). Use extras like `[dev]`, `
   ```
   (regenerate after dependency changes)
 
-## 5) Development workflow checklist (once code exists)
+## 6) Development workflow checklist
 
 1. Create/activate venv and install dev deps:
    ```
@@ -175,12 +175,12 @@ Keep the default install minimal (core runtime only). Use extras like `[dev]`, `
    ```
    uv run tox -e lint,type,test,coverage
    ```
-7. Smoke CLI (once implemented):
+7. Smoke CLI:
    ```
    uv run python -m openwrt_imagegen --help
    ```
 
-## 6) Coding style and conventions
+## 7) Coding style and conventions
 - Python 3.10+, type hints everywhere; prefer `dataclasses` or small `TypedDict`/`Protocol`.
 - Respect module boundaries: keep business logic in `openwrt_imagegen/…`; frontends stay thin.
 - Errors: use explicit exception types (see [OPERATIONS.md](OPERATIONS.md) for taxonomy); propagate subprocess details (exit code, stdout/stderr paths).
@@ -188,31 +188,32 @@ Keep the default install minimal (core runtime only). Use extras like `[dev]`, `
 - Frontends: parse/validate, call core APIs, render JSON/text; stable exit codes (0 success, specific non-zero for common failures).
 - Tests: pytest; prefer deterministic unit tests with fakes/mocks (no real Image Builder downloads or block devices).
 - Style tools: ruff/black (or equivalent) configs in `pyproject.toml`; docstrings for public APIs; brief comments only where logic is non-obvious.
-- Typing: treat mypy as mandatory in CI; add `py.typed` to the package when publishing.
+- Typing: treat mypy as mandatory in CI; `py.typed` marker added to the package.
 - Comments/docstrings: follow PEP 257 for docstrings; use Google-style docstrings for functions/methods with non-trivial parameters/returns. Inline comments should be sparse, informative, and avoid restating code.
 
-## 7) Configuration defaults (planned)
+## 8) Configuration defaults (implemented)
 - Cache root: `~/.cache/openwrt-imagegen/builders`
 - Build working dirs: `<cache_root>/<release>/<target>/<subtarget>/builds/<profile>/<build_id>/`
 - Artifact store: `~/.local/share/openwrt-imagegen/artifacts`
 - Database: `~/.local/share/openwrt-imagegen/db.sqlite` (or configured DB URL)
 - Profiles import/export root: repository `profiles/` unless overridden
-- Env vars: `OWRT_IMG_CACHE`, `OWRT_IMG_ARTIFACTS`, `OWRT_IMG_DB_URL`, `OWRT_IMG_LOG_LEVEL`, `OWRT_IMG_TMPDIR`, `OWRT_IMG_OFFLINE`
+- Env vars: `OWRT_IMG_CACHE_DIR`, `OWRT_IMG_ARTIFACTS_DIR`, `OWRT_IMG_DB_URL`, `OWRT_IMG_LOG_LEVEL`, `OWRT_IMG_TMP_DIR`, `OWRT_IMG_OFFLINE`
 - CLI flags should override env vars: `--cache-dir`, `--artifacts-dir`, `--db-url`, `--tmp-dir`, `--offline`
 - Precedence: CLI flags > env vars > XDG defaults/repo defaults. Document any new knobs as they appear.
+- View current config: `python -m openwrt_imagegen config --json`
 
-## 8) Testing expectations
+## 9) Testing expectations
 - Add `pytest.ini`/`pyproject` config (type warnings as errors where feasible, test paths, markers like `integration`/`flash`).
 - Test strategy (planned): profile validation; cache-key normalization; Image Builder management (mocked downloads); build pipeline with fake subprocess; flashing via temp files and hash verification; CLI/MCP parsing and JSON outputs.
 - Isolation: offline by default; no real `/dev/sdX`; temporary dirs for cache/artifacts/DB; clean up via fixtures.
 - Workflow: add failing test first when practical; cover happy and key failure paths; update docs when behavior/config changes.
 
-## 9) Operational safeguards
+## 10) Operational safeguards
 - Flashing may need elevated permissions; require explicit `--force`/policy, never auto-elevate. Follow [SAFETY.md](SAFETY.md) and [OPERATIONS.md](OPERATIONS.md).
 - Downloads must use official OpenWrt sources; honor offline mode; record checksums/URLs.
 - Avoid symlink traversal/path escapes when unpacking archives or handling overlays.
 
-## 10) Release/CI hygiene
+## 11) Release/CI hygiene
 - Use SemVer for package/CLI; expose version via CLI. Maintain migrations once ORM exists.
 - Plan to add `CHANGELOG.md` when code ships; document migrations and support changes.
 - Keep [OPERATIONS.md](OPERATIONS.md) updated with error codes, security constraints, and release process; keep this file current as commands and tooling evolve.

@@ -5,10 +5,12 @@ These instructions tell AI coding agents how to work efficiently in this reposit
 ## 1. What this repo is
 
 - Purpose: opinionated orchestration around the official **OpenWrt Image Builder** for many devices, with profiles, builds, artifacts, and (eventually) TF/SD flashing managed by a shared Python library plus thin frontends.
-- Current status (see `docs/DEVELOPMENT.md`): **design‑heavy, code‑light**. There is:
-  - No `pyproject.toml`, no `openwrt_imagegen/` package, and no tests yet.
+- Current status (see `docs/DEVELOPMENT.md`): **package skeleton implemented**. There is:
+  - `pyproject.toml` with Python ≥3.10 and dependency groups (core, dev, web, postgres, ops).
+  - `openwrt_imagegen/` package with subpackages (`imagebuilder/`, `profiles/`, `builds/`, `flash/`) and shared modules (`types.py`, `config.py`, `cli.py`).
+  - Tests in `tests/` with CLI smoke tests, config tests, and types tests.
   - A rich set of design docs under `docs/` and sample device profiles under `profiles/`.
-- Expected future tech stack:
+- Tech stack:
   - Python ≥ 3.10, packaged via `pyproject.toml`.
   - CLI (Typer + Rich), optional FastAPI web app, optional MCP server.
   - ORM (SQLAlchemy + Alembic), Pydantic for models, HTTPX, Ruff/Mypy/Pytest for QA (see `docs/DEVELOPMENT.md`).
@@ -30,6 +32,18 @@ Repository is intentionally small:
 - `profiles/`: concrete device profile examples in YAML plus future overlay files in `profiles/overlays/`.
 - `.github/`: this file (Copilot instructions). CI workflows are not present yet.
 
+The package structure:
+
+- `openwrt_imagegen/`: main Python package
+  - `__init__.py`: package metadata and version
+  - `types.py`: shared type definitions (enums, dataclasses, TypedDicts)
+  - `config.py`: pydantic Settings for configuration
+  - `cli.py`: Typer-based CLI with subcommands
+  - `__main__.py`: entry point for `python -m openwrt_imagegen`
+  - `imagebuilder/`, `profiles/`, `builds/`, `flash/`: subpackages (skeleton)
+  - `py.typed`: marker for typed package
+- `tests/`: test files mirroring package structure
+
 When adding real code, follow `docs/ARCHITECTURE.md` and `docs/AI_CONTRIBUTING.md`:
 
 - Create `openwrt_imagegen/` at repo root with subpackages:
@@ -45,13 +59,11 @@ Do **not** introduce alternate core packages or top‑level folders for business
 
 ## 3. Build, test, and run commands
 
-Because no Python package or CI exists yet, **there are currently no working build/test/lint commands**. You must create them as part of the first implementation PR.
+The Python package and tooling are now available. Use these commands:
 
-Planned, validated workflow once `pyproject.toml` and the package exist (from `docs/DEVELOPMENT.md`):
+1. Environment bootstrap
 
-1. Environment bootstrap (once `pyproject.toml` is added)
-
-   - Always create and activate a virtualenv, then install the project in editable mode:
+   - Create and activate a virtualenv, then install the project in editable mode:
      ```bash
      uv venv .venv
      source .venv/bin/activate
@@ -62,9 +74,9 @@ Planned, validated workflow once `pyproject.toml` and the package exist (from `d
      uv pip install -e .[dev,web,postgres,ops]
      ```
 
-2. Linting and type checks (once configured in `pyproject.toml`)
+2. Linting and type checks
 
-   - Preferred commands:
+   - Run these commands:
      ```bash
      uv run ruff check
      uv run ruff format --check
@@ -73,18 +85,20 @@ Planned, validated workflow once `pyproject.toml` and the package exist (from `d
 
 3. Tests and coverage
 
-   - Tests are expected to live under `tests/` and be runnable with:
+   - Tests live under `tests/` and are runnable with:
      ```bash
      uv run pytest
      uv run pytest --cov --cov-report=term-missing
      ```
    - Tests must not depend on real OpenWrt downloads or real block devices; use fakes/mocks and temp dirs.
 
-4. CLI smoke test (after CLI exists)
+4. CLI smoke test
 
-   - Implement a minimal CLI so this always works without network or DB:
+   - The minimal CLI works offline:
      ```bash
      uv run python -m openwrt_imagegen --help
+     uv run python -m openwrt_imagegen --version
+     uv run python -m openwrt_imagegen config --json
      ```
 
 5. Tox (optional, if introduced)
