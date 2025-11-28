@@ -28,9 +28,11 @@ This repository provides an opinionated Python library for managing OpenWrt Imag
    - Implemented `config.py` (pydantic Settings) with paths, concurrency, offline mode, verification mode; exposed `config` command in CLI.
    - Remaining: Set up logging config helper to emit structured logs; include request IDs.
 
-3. **ORM models + DB plumbing**  
-   - Define models in `profiles/models.py`, `imagebuilder/models.py`, `builds/models.py`, optional `flash/models.py`; integrate SQLAlchemy session management.
-   - Add Alembic with initial migration; add tests for model creation and basic CRUD.
+3. **ORM models + DB plumbing** ✅ (completed)
+   - Defined models in `profiles/models.py` (Profile), `imagebuilder/models.py` (ImageBuilder), `builds/models.py` (BuildRecord, Artifact), `flash/models.py` (FlashRecord).
+   - Added `db.py` with SQLAlchemy engine, session management, and Base model.
+   - Added Alembic with initial migration (`alembic/versions/`).
+   - Added comprehensive CRUD tests in `tests/test_models.py`.
 
 4. **Profile validation + import/export**  
    - Implement `profiles/schema.py` (Pydantic), `profiles/io.py`, `profiles/service.py` for CRUD/query/import/export; tests for validation and bulk import/export reporting.

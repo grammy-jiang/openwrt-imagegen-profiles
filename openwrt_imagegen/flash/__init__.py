@@ -12,3 +12,7 @@ All operations follow the safety rules in docs/SAFETY.md:
 - Synchronous, flushed writes
 - Hash verification after write
 """
+
+from openwrt_imagegen.flash.models import FlashRecord
+
+__all__ = ["FlashRecord"]
