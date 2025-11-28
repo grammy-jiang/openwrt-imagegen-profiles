@@ -24,10 +24,20 @@ Frontends are thin adapters over that library:
 
 This project does **not** replace the OpenWrt SDK or Image Builder; it wraps the official tools with higher-level workflows, safety checks, and persistent metadata.
 
-- For the detailed architecture (data model, Image Builder management, artifact tracking, TF card safety), see [ARCHITECTURE.md](ARCHITECTURE.md).
-- For the profile schema and concrete profile examples, see [PROFILES.md](PROFILES.md).
-- For build orchestration and cache behavior, see [BUILD_PIPELINE.md](BUILD_PIPELINE.md).
-- For TF/SD flashing safety rules and operator guidance, see [SAFETY.md](SAFETY.md).
-- For database/ORM model concepts, see [DB_MODELS.md](DB_MODELS.md).
-- For frontend responsibilities (CLI, web, MCP), see [FRONTENDS.md](FRONTENDS.md).
-- For AI/agent-specific contribution rules and expectations, see [AI_CONTRIBUTING.md](AI_CONTRIBUTING.md), [AI_WORKFLOW.md](AI_WORKFLOW.md), and [Copilot instructions](.github/copilot-instructions.md).
+- For the detailed architecture (data model, Image Builder management, artifact tracking, TF card safety), see [ARCHITECTURE.md](docs/ARCHITECTURE.md).
+- For the profile schema and concrete profile examples, see [PROFILES.md](docs/PROFILES.md).
+- For build orchestration and cache behavior, see [BUILD_PIPELINE.md](docs/BUILD_PIPELINE.md).
+- For TF/SD flashing safety rules and operator guidance, see [SAFETY.md](docs/SAFETY.md).
+- For database/ORM model concepts, see [DB_MODELS.md](docs/DB_MODELS.md).
+- For frontend responsibilities (CLI, web, MCP), see [FRONTENDS.md](docs/FRONTENDS.md).
+- For AI/agent-specific contribution rules and expectations, see [AI_CONTRIBUTING.md](docs/AI_CONTRIBUTING.md), [AI_WORKFLOW.md](docs/AI_WORKFLOW.md), and [Copilot instructions](.github/copilot-instructions.md).
+
+## AI usage
+
+If you use AI tools (for example GitHub Copilot agents) with this repository, those
+tools must follow the policies in [AI_CONTRIBUTING.md](docs/AI_CONTRIBUTING.md) and the
+runtime instructions in [Copilot instructions](.github/copilot-instructions.md).
+
+[AI_WORKFLOW.md](docs/AI_WORKFLOW.md) describes the expected step-by-step workflow for AI
+agents (plan, read docs, make small changes, run tests, update docs, and summarize
+results).

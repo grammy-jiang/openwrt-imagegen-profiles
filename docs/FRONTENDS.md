@@ -210,7 +210,7 @@ Model Context Protocol.
   defaults that honor those rules.
 - `DB_MODELS.md` defines the ORM model concepts; frontends should rely on those
   shapes for their API schemas.
-- `AI_CONTRIBUTING.md` and `.github/copilot-instructions.md` emphasize:
+- `AI_CONTRIBUTING.md` and `../.github/copilot-instructions.md` emphasize:
   - No reimplementation of build/flash logic in frontends.
   - Database + ORM as the source of truth.
 

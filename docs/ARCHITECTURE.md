@@ -1,6 +1,6 @@
 # Architecture Overview
 
-This repository defines an AI-friendly toolchain for building and managing custom OpenWrt firmware images across multiple devices. It combines (see also [README.md](README.md)):
+This repository defines an AI-friendly toolchain for building and managing custom OpenWrt firmware images across multiple devices. It combines (see also [README.md](../README.md)):
 
 - **Declarative device profiles** – version-controlled descriptions of how each device’s image should be built.
 - **A Python orchestration core** – responsible for dynamically fetching and caching the official OpenWrt Image Builder, running reproducible builds, tracking artifacts, and coordinating flash workflows.
@@ -218,7 +218,7 @@ Several principles guide the overall design and should be preserved when extendi
 
 ---
 
-For a quick, human- and AI-oriented summary of the project purpose and outcomes, see `README.md`. For detailed component-level behavior and extension guidelines, this `ARCHITECTURE.md` is the primary reference. For the concrete profile schema and examples used by the profile management layer, see `PROFILES.md`.
+For a quick, human- and AI-oriented summary of the project purpose and outcomes, see [README.md](../README.md). For detailed component-level behavior and extension guidelines, this `ARCHITECTURE.md` is the primary reference. For the concrete profile schema and examples used by the profile management layer, see `PROFILES.md`.
 
 ---
 
@@ -258,8 +258,8 @@ This structure is intended as guidance for future code rather than a strict requ
 
 ## TODO / coordination for AI onboarding
 
-- Keep `.github/copilot-instructions.md` in sync with this document whenever you:
+- Keep `../.github/copilot-instructions.md` in sync with this document whenever you:
   - Add real code under `openwrt_imagegen/`.
   - Introduce tests, CI workflows, or new frontends.
   - Change how builds, profiles, or flashing are wired.
-- Treat `.github/copilot-instructions.md` as the **entrypoint** for AI agents; update it in the same PR as any architectural change so future agents don’t need to rediscover the workflow or run failing commands.
+- Treat `../.github/copilot-instructions.md` as the **entrypoint** for AI agents; update it in the same PR as any architectural change so future agents don’t need to rediscover the workflow or run failing commands.

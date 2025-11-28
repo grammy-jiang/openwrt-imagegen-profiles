@@ -1,6 +1,6 @@
 # AI Contribution Instructions
 
-This document tells AI agents **how to work in this repository**: what is allowed, what is off-limits, and where to put new code. It summarizes and operationalizes the design in [ARCHITECTURE.md](ARCHITECTURE.md).
+This document tells AI agents **how to work in this repository**: what is allowed, what is off-limits, and where to put new code. It summarizes and operationalizes the design in [ARCHITECTURE.md](ARCHITECTURE.md) and serves as the **authoritative rule set** for how AI tools are allowed to change this repository.
 
 If you are an AI making changes here, follow this as a hard contract.
 
@@ -247,7 +247,7 @@ If you’re an AI agent and you’re unsure:
   - Adding or updating **core library APIs** in `openwrt_imagegen/` + tests.
   - Minimal changes to CLI/web/MCP just to wire through new functionality.
 - Re-read:
-  - `README.md` for high-level intent.
+  - [README.md](../README.md) for high-level intent.
   - `ARCHITECTURE.md` for authoritative details.
 
 Never introduce new cross‑cutting patterns (configuration style, logging framework, DB layer) without aligning them with the existing architecture.

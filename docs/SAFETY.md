@@ -284,7 +284,7 @@ For human operators using CLI or web UI, the following practices are recommended
 AI agents working on flashing-related code must also follow:
 
 - `AI_CONTRIBUTING.md` – for overall safety rules and expectations.
-- `.github/copilot-instructions.md` – for a condensed version of those rules.
+- `../.github/copilot-instructions.md` – for a condensed version of those rules.
 
 In particular:
 
