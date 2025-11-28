@@ -325,10 +325,103 @@ app.add_typer(builders_app, name="builders")
 
 
 @builders_app.command("list")
-def builders_list() -> None:
+def builders_list(
+    release: Annotated[
+        str | None,
+        typer.Option("--release", "-r", help="Filter by release"),
+    ] = None,
+    target: Annotated[
+        str | None,
+        typer.Option("--target", "-t", help="Filter by target"),
+    ] = None,
+    subtarget: Annotated[
+        str | None,
+        typer.Option("--subtarget", "-s", help="Filter by subtarget"),
+    ] = None,
+    state: Annotated[
+        str | None,
+        typer.Option(
+            "--state", help="Filter by state (pending, ready, broken, deprecated)"
+        ),
+    ] = None,
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Output as JSON"),
+    ] = False,
+) -> None:
     """List cached Image Builders."""
-    console.print("[yellow]Not yet implemented[/yellow]")
-    raise typer.Exit(code=1)
+    from openwrt_imagegen.db import create_all_tables, get_engine, get_session_factory
+    from openwrt_imagegen.imagebuilder.service import list_builders
+    from openwrt_imagegen.types import ImageBuilderState
+
+    engine = get_engine()
+    create_all_tables(engine)
+    factory = get_session_factory(engine)
+
+    # Parse state filter
+    state_filter: ImageBuilderState | None = None
+    if state:
+        try:
+            state_filter = ImageBuilderState(state)
+        except ValueError:
+            console.print(f"[red]Invalid state: {state}[/red]")
+            console.print("Valid values: pending, ready, broken, deprecated")
+            raise typer.Exit(code=1) from None
+
+    with factory() as session:
+        builders = list_builders(
+            session,
+            release=release,
+            target=target,
+            subtarget=subtarget,
+            state=state_filter,
+        )
+
+        if not builders:
+            if json_output:
+                console.print("[]")
+            else:
+                console.print("[yellow]No Image Builders found[/yellow]")
+            return
+
+        if json_output:
+            output = [
+                {
+                    "openwrt_release": b.openwrt_release,
+                    "target": b.target,
+                    "subtarget": b.subtarget,
+                    "state": b.state,
+                    "root_dir": b.root_dir,
+                    "checksum": b.checksum,
+                    "signature_verified": b.signature_verified,
+                    "first_used_at": b.first_used_at.isoformat()
+                    if b.first_used_at
+                    else None,
+                    "last_used_at": b.last_used_at.isoformat()
+                    if b.last_used_at
+                    else None,
+                }
+                for b in builders
+            ]
+            console.print(json.dumps(output, indent=2))
+        else:
+            console.print(f"[bold]Found {len(builders)} Image Builder(s):[/bold]")
+            console.print()
+            for b in builders:
+                state_color = {
+                    "ready": "green",
+                    "pending": "yellow",
+                    "broken": "red",
+                    "deprecated": "dim",
+                }.get(b.state, "white")
+                console.print(
+                    f"  [{state_color}]{b.openwrt_release}/{b.target}/{b.subtarget}[/{state_color}]"
+                )
+                console.print(f"    State: {b.state}")
+                console.print(f"    Root: {b.root_dir}")
+                if b.last_used_at:
+                    console.print(f"    Last used: {b.last_used_at.isoformat()}")
+                console.print()
 
 
 @builders_app.command("ensure")
@@ -336,12 +429,147 @@ def builders_ensure(
     release: Annotated[str, typer.Argument(help="OpenWrt release version")],
     target: Annotated[str, typer.Argument(help="Target platform")],
     subtarget: Annotated[str, typer.Argument(help="Subtarget")],
+    force: Annotated[
+        bool,
+        typer.Option("--force", "-f", help="Force re-download even if cached"),
+    ] = False,
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Output as JSON"),
+    ] = False,
 ) -> None:
     """Ensure an Image Builder is available."""
-    console.print(
-        f"[yellow]Not yet implemented: ensure builder {release}/{target}/{subtarget}[/yellow]"
+    from openwrt_imagegen.db import create_all_tables, get_engine, get_session_factory
+    from openwrt_imagegen.imagebuilder.service import (
+        ImageBuilderBrokenError,
+        OfflineModeError,
+        ensure_builder,
     )
-    raise typer.Exit(code=1)
+
+    engine = get_engine()
+    create_all_tables(engine)
+    factory = get_session_factory(engine)
+
+    with factory() as session:
+        try:
+            console.print(
+                f"[blue]Ensuring Image Builder {release}/{target}/{subtarget}...[/blue]"
+            )
+            builder = ensure_builder(
+                session,
+                release=release,
+                target=target,
+                subtarget=subtarget,
+                force_download=force,
+            )
+            session.commit()
+
+            if json_output:
+                output = {
+                    "openwrt_release": builder.openwrt_release,
+                    "target": builder.target,
+                    "subtarget": builder.subtarget,
+                    "state": builder.state,
+                    "root_dir": builder.root_dir,
+                    "checksum": builder.checksum,
+                }
+                console.print(json.dumps(output, indent=2))
+            else:
+                console.print(
+                    f"[green]✓ Image Builder ready: {release}/{target}/{subtarget}[/green]"
+                )
+                console.print(f"  Root: {builder.root_dir}")
+                if builder.checksum:
+                    console.print(f"  Checksum: {builder.checksum[:16]}...")
+
+        except OfflineModeError:
+            console.print("[red]Cannot download in offline mode[/red]")
+            raise typer.Exit(code=1) from None
+        except ImageBuilderBrokenError:
+            console.print(
+                f"[red]Image Builder {release}/{target}/{subtarget} is broken. "
+                "Use --force to re-download.[/red]"
+            )
+            raise typer.Exit(code=1) from None
+        except Exception as e:
+            console.print(f"[red]Failed to ensure Image Builder: {e}[/red]")
+            raise typer.Exit(code=1) from None
+
+
+@builders_app.command("info")
+def builders_info(
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Output as JSON"),
+    ] = False,
+) -> None:
+    """Show Image Builder cache information."""
+    from openwrt_imagegen.imagebuilder.service import get_builder_cache_info
+
+    info = get_builder_cache_info()
+
+    if json_output:
+        console.print(json.dumps(info, indent=2))
+    else:
+        console.print("[bold]Image Builder Cache Information:[/bold]")
+        console.print()
+        console.print(f"  Cache directory: {info['cache_dir']}")
+        console.print(f"  Exists: {info['exists']}")
+        console.print(f"  Total size: {info['total_size_human']}")
+
+
+@builders_app.command("prune")
+def builders_prune(
+    deprecated_only: Annotated[
+        bool,
+        typer.Option(
+            "--deprecated-only", help="Only prune deprecated builders (default)"
+        ),
+    ] = True,
+    dry_run: Annotated[
+        bool,
+        typer.Option(
+            "--dry-run", "-n", help="Show what would be pruned without actually pruning"
+        ),
+    ] = False,
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Output as JSON"),
+    ] = False,
+) -> None:
+    """Prune unused or deprecated Image Builders."""
+    from openwrt_imagegen.db import create_all_tables, get_engine, get_session_factory
+    from openwrt_imagegen.imagebuilder.service import prune_builders
+
+    engine = get_engine()
+    create_all_tables(engine)
+    factory = get_session_factory(engine)
+
+    with factory() as session:
+        pruned = prune_builders(
+            session,
+            deprecated_only=deprecated_only,
+            dry_run=dry_run,
+        )
+        if not dry_run:
+            session.commit()
+
+        if json_output:
+            output = {
+                "dry_run": dry_run,
+                "pruned": [
+                    {"release": r, "target": t, "subtarget": s} for r, t, s in pruned
+                ],
+            }
+            console.print(json.dumps(output, indent=2))
+        else:
+            if not pruned:
+                console.print("[yellow]No Image Builders to prune[/yellow]")
+            else:
+                prefix = "[DRY RUN] Would prune" if dry_run else "Pruned"
+                console.print(f"[bold]{prefix} {len(pruned)} Image Builder(s):[/bold]")
+                for r, t, s in pruned:
+                    console.print(f"  - {r}/{t}/{s}")
 
 
 builds_app = typer.Typer(help="Build images")
