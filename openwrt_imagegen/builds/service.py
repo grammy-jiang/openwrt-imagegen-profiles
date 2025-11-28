@@ -616,6 +616,7 @@ def resolve_batch_profiles(
         Sequence of Profile ORM instances matching the filter.
     """
     from openwrt_imagegen.profiles.service import (
+        ProfileNotFoundError,
         get_profile,
         query_profiles,
     )
@@ -627,7 +628,7 @@ def resolve_batch_profiles(
             try:
                 profile = get_profile(session, pid)
                 profiles.append(profile)
-            except Exception:
+            except ProfileNotFoundError:
                 # Skip profiles that don't exist - error will be recorded
                 pass
         return profiles
@@ -715,6 +716,10 @@ def build_batch(
                 stopped_early = True
                 break
 
+    def _check_fail_fast() -> bool:
+        """Check if batch should stop due to fail-fast mode."""
+        return mode == BatchMode.FAIL_FAST
+
     # Process each profile
     for profile in profiles:
         if stopped_early:
@@ -739,9 +744,7 @@ def build_batch(
                 profile_result.error_message = str(e)
                 results.append(profile_result)
                 failed += 1
-
-                if mode == BatchMode.FAIL_FAST:
-                    stopped_early = True
+                stopped_early = _check_fail_fast()
                 continue
 
             # Run the build
@@ -786,26 +789,32 @@ def build_batch(
                     profile_result.error_code = build.error_type
                     profile_result.error_message = build.error_message
                     failed += 1
+                    stopped_early = _check_fail_fast()
 
-                    if mode == BatchMode.FAIL_FAST:
-                        stopped_early = True
-
-            except (BuildServiceError, OverlayStagingError, BuildExecutionError) as e:
-                profile_result.error_code = getattr(e, "code", "build_error")
+            except BuildServiceError as e:
+                profile_result.error_code = e.code
                 profile_result.error_message = str(e)
                 failed += 1
+                stopped_early = _check_fail_fast()
 
-                if mode == BatchMode.FAIL_FAST:
-                    stopped_early = True
+            except OverlayStagingError as e:
+                profile_result.error_code = "overlay_error"
+                profile_result.error_message = str(e)
+                failed += 1
+                stopped_early = _check_fail_fast()
+
+            except BuildExecutionError as e:
+                profile_result.error_code = e.code
+                profile_result.error_message = str(e)
+                failed += 1
+                stopped_early = _check_fail_fast()
 
         except Exception as e:
             logger.exception("Unexpected error building profile %s", profile.profile_id)
             profile_result.error_code = "unexpected_error"
             profile_result.error_message = str(e)
             failed += 1
-
-            if mode == BatchMode.FAIL_FAST:
-                stopped_early = True
+            stopped_early = _check_fail_fast()
 
         results.append(profile_result)
 
