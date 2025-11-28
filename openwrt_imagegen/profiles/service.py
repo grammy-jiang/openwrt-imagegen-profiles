@@ -605,7 +605,10 @@ def export_profiles_to_directory(
         if not safe_id:
             safe_id = f"profile_{profile.id}"
         filename = safe_id + ext
-        path = directory / filename
+        path = (directory / filename).resolve()
+        # Ensure the resolved path is within the intended directory
+        if not path.is_relative_to(directory.resolve()):
+            raise ValueError(f"Invalid filename would escape directory: {filename}")
 
         # Security check: ensure the resolved path is within the target directory
         # This prevents path traversal even if sanitization misses something
