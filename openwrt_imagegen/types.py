@@ -88,7 +88,7 @@ class OperationResult:
     message: str
     code: str | None = None
     log_path: str | None = None
-    details: dict[str, object] | None = field(default_factory=dict)
+    details: dict[str, object] = field(default_factory=dict)
 
 
 @dataclass
