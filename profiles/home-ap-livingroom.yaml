@@ -10,7 +10,7 @@ tags:
   - home
   - ap
   - wifi
-  - 23.05
+  - "23.05"
 
 openwrt_release: "23.05.2"
 target: ath79

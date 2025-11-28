@@ -94,6 +94,15 @@ def create_all_tables(engine: Any | None = None) -> None:
     Args:
         engine: SQLAlchemy engine. If not provided, creates one from settings.
     """
+    # Import all models to ensure they are registered with SQLAlchemy's mapper
+    # before creating tables. This resolves relationship references.
+    from openwrt_imagegen.builds import models as builds_models  # noqa: F401
+    from openwrt_imagegen.flash import models as flash_models  # noqa: F401
+    from openwrt_imagegen.imagebuilder import (
+        models as imagebuilder_models,  # noqa: F401
+    )
+    from openwrt_imagegen.profiles import models as profiles_models  # noqa: F401
+
     if engine is None:
         engine = get_engine()
     Base.metadata.create_all(bind=engine)
