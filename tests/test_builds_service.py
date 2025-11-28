@@ -411,3 +411,218 @@ class TestBuildOrReuseMocked:
                         # Should not be cache hit, should have run build
                         assert is_cache_hit is False
                         assert mock_run.called
+
+
+class TestBatchBuild:
+    """Tests for batch build functionality."""
+
+    @pytest.fixture
+    def mock_settings(self, tmp_path):
+        """Create mock settings."""
+        settings = MagicMock()
+        settings.cache_dir = tmp_path / "cache"
+        settings.cache_dir.mkdir()
+        settings.artifacts_dir = tmp_path / "artifacts"
+        settings.artifacts_dir.mkdir()
+        settings.build_timeout = 3600
+        return settings
+
+    def test_resolve_batch_profiles_by_ids(self, session, profile):
+        """Should resolve profiles by explicit IDs."""
+        # profile fixture is needed to create profile in DB
+        _ = profile  # noqa: F841
+
+        from openwrt_imagegen.builds.service import (
+            BatchBuildFilter,
+            resolve_batch_profiles,
+        )
+
+        filter_spec = BatchBuildFilter(profile_ids=["test.service"])
+        profiles = resolve_batch_profiles(session, filter_spec)
+
+        assert len(profiles) == 1
+        assert profiles[0].profile_id == "test.service"
+
+    def test_resolve_batch_profiles_by_release(self, session, profile):
+        """Should resolve profiles by release filter."""
+        # profile fixture is needed to create profile in DB
+        _ = profile  # noqa: F841
+
+        from openwrt_imagegen.builds.service import (
+            BatchBuildFilter,
+            resolve_batch_profiles,
+        )
+
+        filter_spec = BatchBuildFilter(openwrt_release="23.05.3")
+        profiles = resolve_batch_profiles(session, filter_spec)
+
+        assert len(profiles) == 1
+        assert profiles[0].profile_id == "test.service"
+
+    def test_resolve_batch_profiles_missing_ids(self, session, profile):
+        """Should skip missing profile IDs."""
+        # profile fixture is needed to create profile in DB
+        _ = profile  # noqa: F841
+
+        from openwrt_imagegen.builds.service import (
+            BatchBuildFilter,
+            resolve_batch_profiles,
+        )
+
+        filter_spec = BatchBuildFilter(profile_ids=["test.service", "nonexistent"])
+        profiles = resolve_batch_profiles(session, filter_spec)
+
+        assert len(profiles) == 1
+        assert profiles[0].profile_id == "test.service"
+
+    def test_resolve_batch_profiles_by_target(self, session, profile):
+        """Should resolve profiles by target filter."""
+        # profile fixture is needed to create profile in DB
+        _ = profile  # noqa: F841
+
+        from openwrt_imagegen.builds.service import (
+            BatchBuildFilter,
+            resolve_batch_profiles,
+        )
+
+        filter_spec = BatchBuildFilter(target="ath79", subtarget="generic")
+        profiles = resolve_batch_profiles(session, filter_spec)
+
+        assert len(profiles) == 1
+        assert profiles[0].profile_id == "test.service"
+
+    def test_batch_build_filter_model(self):
+        """Should create batch build filter from values."""
+        from openwrt_imagegen.builds.service import BatchBuildFilter
+
+        filter_spec = BatchBuildFilter(
+            profile_ids=["a", "b"],
+            openwrt_release="23.05.3",
+            target="ath79",
+            subtarget="generic",
+            tags=["wifi", "ap"],
+        )
+
+        assert filter_spec.profile_ids == ["a", "b"]
+        assert filter_spec.openwrt_release == "23.05.3"
+        assert filter_spec.target == "ath79"
+        assert filter_spec.subtarget == "generic"
+        assert filter_spec.tags == ["wifi", "ap"]
+
+    def test_profile_build_result_to_dict(self):
+        """Should convert ProfileBuildResult to dict."""
+        from openwrt_imagegen.builds.service import ProfileBuildResult
+        from openwrt_imagegen.types import ArtifactInfo
+
+        result = ProfileBuildResult(
+            profile_id="test.profile",
+            build_id=42,
+            success=True,
+            is_cache_hit=False,
+            artifacts=[
+                ArtifactInfo(
+                    filename="test.bin",
+                    relative_path="test.bin",
+                    size_bytes=1000,
+                    sha256="abc123",
+                    kind="sysupgrade",
+                )
+            ],
+        )
+
+        d = result.to_dict()
+        assert d["profile_id"] == "test.profile"
+        assert d["build_id"] == 42
+        assert d["success"] is True
+        assert len(d["artifacts"]) == 1
+        assert d["artifacts"][0]["filename"] == "test.bin"
+
+    def test_batch_build_missing_profiles(self, session, mock_settings):
+        """Should report errors for missing profiles."""
+        from openwrt_imagegen.builds.service import (
+            BatchBuildFilter,
+            build_batch,
+        )
+        from openwrt_imagegen.types import BatchMode
+
+        filter_spec = BatchBuildFilter(profile_ids=["nonexistent"])
+
+        result = build_batch(
+            session=session,
+            filter_spec=filter_spec,
+            settings=mock_settings,
+            mode=BatchMode.BEST_EFFORT,
+        )
+
+        assert result.total == 1
+        assert result.failed == 1
+        assert result.succeeded == 0
+        assert len(result.results) == 1
+        assert result.results[0]["error_code"] == "profile_not_found"
+
+    def test_batch_build_fail_fast_stops(self, session, mock_settings):
+        """Should stop on first failure in fail-fast mode."""
+        from openwrt_imagegen.builds.service import (
+            BatchBuildFilter,
+            build_batch,
+        )
+        from openwrt_imagegen.types import BatchMode
+
+        filter_spec = BatchBuildFilter(
+            profile_ids=["nonexistent1", "nonexistent2", "nonexistent3"]
+        )
+
+        result = build_batch(
+            session=session,
+            filter_spec=filter_spec,
+            settings=mock_settings,
+            mode=BatchMode.FAIL_FAST,
+        )
+
+        assert result.stopped_early is True
+        assert result.failed == 1
+        # Only one profile should have been processed
+        assert result.total == 1
+
+    def test_batch_build_best_effort_continues(self, session, mock_settings):
+        """Should continue after failures in best-effort mode."""
+        from openwrt_imagegen.builds.service import (
+            BatchBuildFilter,
+            build_batch,
+        )
+        from openwrt_imagegen.types import BatchMode
+
+        filter_spec = BatchBuildFilter(
+            profile_ids=["nonexistent1", "nonexistent2", "nonexistent3"]
+        )
+
+        result = build_batch(
+            session=session,
+            filter_spec=filter_spec,
+            settings=mock_settings,
+            mode=BatchMode.BEST_EFFORT,
+        )
+
+        assert result.stopped_early is False
+        assert result.failed == 3
+        assert result.total == 3
+
+    def test_batch_build_result_model(self):
+        """Should create batch build result model."""
+        from openwrt_imagegen.builds.service import BatchBuildResult
+
+        result = BatchBuildResult(
+            total=5,
+            succeeded=3,
+            failed=2,
+            cache_hits=1,
+            mode="best-effort",
+            stopped_early=False,
+            results=[],
+        )
+
+        assert result.total == 5
+        assert result.succeeded == 3
+        assert result.failed == 2
+        assert result.cache_hits == 1
+        assert result.mode == "best-effort"

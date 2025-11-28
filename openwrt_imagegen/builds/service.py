@@ -2,6 +2,7 @@
 
 This module provides the high-level build API:
 - build_or_reuse(): Main entry point - build with cache awareness
+- build_batch(): Batch build orchestration with filters
 - Cache lookup by key
 - Locking to prevent duplicate builds
 - Build record and artifact persistence
@@ -18,12 +19,14 @@ import shutil
 import tempfile
 import time
 import uuid
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -45,7 +48,7 @@ from openwrt_imagegen.builds.runner import (
     validate_imagebuilder_root,
 )
 from openwrt_imagegen.config import get_settings
-from openwrt_imagegen.types import ArtifactInfo, BuildStatus
+from openwrt_imagegen.types import ArtifactInfo, BatchMode, BuildStatus
 
 if TYPE_CHECKING:
     from openwrt_imagegen.config import Settings
@@ -503,14 +506,333 @@ def get_build_artifacts(session: Session, build_id: int) -> list[Artifact]:
     return list(build.artifacts)
 
 
+# Batch Build Types and Functions
+
+
+@dataclass
+class ProfileBuildResult:
+    """Result of building a single profile in a batch.
+
+    Attributes:
+        profile_id: The profile ID that was built.
+        build_id: The build record ID if successful.
+        success: Whether the build succeeded.
+        is_cache_hit: Whether a cached build was reused.
+        error_code: Error code if failed.
+        error_message: Error message if failed.
+        log_path: Path to build log file.
+        artifacts: List of artifact info if successful.
+    """
+
+    profile_id: str
+    build_id: int | None = None
+    success: bool = False
+    is_cache_hit: bool = False
+    error_code: str | None = None
+    error_message: str | None = None
+    log_path: str | None = None
+    artifacts: list[ArtifactInfo] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            "profile_id": self.profile_id,
+            "build_id": self.build_id,
+            "success": self.success,
+            "is_cache_hit": self.is_cache_hit,
+            "error_code": self.error_code,
+            "error_message": self.error_message,
+            "log_path": self.log_path,
+            "artifacts": [
+                {
+                    "filename": a.filename,
+                    "relative_path": a.relative_path,
+                    "size_bytes": a.size_bytes,
+                    "sha256": a.sha256,
+                    "kind": a.kind,
+                }
+                for a in self.artifacts
+            ],
+        }
+
+
+class BatchBuildResult(BaseModel):
+    """Result of a batch build operation.
+
+    Attributes:
+        total: Total number of profiles processed.
+        succeeded: Number of successful builds.
+        failed: Number of failed builds.
+        cache_hits: Number of builds that reused cache.
+        mode: Batch mode used (fail-fast or best-effort).
+        stopped_early: Whether batch was stopped before completion.
+        results: Per-profile build results.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    total: int
+    succeeded: int
+    failed: int
+    cache_hits: int
+    mode: str
+    stopped_early: bool = False
+    results: list[dict[str, Any]]
+
+
+class BatchBuildFilter(BaseModel):
+    """Filter for selecting profiles in batch builds.
+
+    Attributes:
+        profile_ids: Explicit list of profile IDs.
+        device_id: Filter by device ID.
+        openwrt_release: Filter by release.
+        target: Filter by target.
+        subtarget: Filter by subtarget.
+        tags: Filter by tags (must have all).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    profile_ids: list[str] | None = None
+    device_id: str | None = None
+    openwrt_release: str | None = None
+    target: str | None = None
+    subtarget: str | None = None
+    tags: list[str] | None = None
+
+
+def resolve_batch_profiles(
+    session: Session,
+    filter_spec: BatchBuildFilter,
+) -> Sequence[Profile]:
+    """Resolve profile filter to a list of profiles.
+
+    Args:
+        session: Database session.
+        filter_spec: Filter specification.
+
+    Returns:
+        Sequence of Profile ORM instances matching the filter.
+    """
+    from openwrt_imagegen.profiles.service import (
+        get_profile,
+        query_profiles,
+    )
+
+    # If explicit profile IDs provided, fetch those
+    if filter_spec.profile_ids:
+        profiles = []
+        for pid in filter_spec.profile_ids:
+            try:
+                profile = get_profile(session, pid)
+                profiles.append(profile)
+            except Exception:
+                # Skip profiles that don't exist - error will be recorded
+                pass
+        return profiles
+
+    # Otherwise use query filters
+    return query_profiles(
+        session,
+        device_id=filter_spec.device_id,
+        openwrt_release=filter_spec.openwrt_release,
+        target=filter_spec.target,
+        subtarget=filter_spec.subtarget,
+        tags=filter_spec.tags,
+    )
+
+
+def build_batch(
+    session: Session,
+    filter_spec: BatchBuildFilter,
+    settings: Settings | None = None,
+    mode: BatchMode = BatchMode.BEST_EFFORT,
+    force_rebuild: bool = False,
+    extra_packages: list[str] | None = None,
+    build_options: dict[str, Any] | None = None,
+    base_path: Path | None = None,
+) -> BatchBuildResult:
+    """Build images for multiple profiles.
+
+    This is the batch build entry point. It:
+    1. Resolves the filter to a list of profiles
+    2. For each profile: ensures Image Builder, builds (or reuses cache)
+    3. Aggregates results with per-profile status
+    4. Supports fail-fast (stop on first failure) or best-effort (continue)
+
+    Args:
+        session: Database session.
+        filter_spec: Filter for selecting profiles.
+        settings: Application settings.
+        mode: Batch mode (fail-fast or best-effort).
+        force_rebuild: Force rebuild even if cached.
+        extra_packages: Additional packages for all builds.
+        build_options: Additional build options for all builds.
+        base_path: Base path for resolving overlay sources.
+
+    Returns:
+        BatchBuildResult with aggregated results.
+    """
+    from openwrt_imagegen.imagebuilder.service import ensure_builder
+    from openwrt_imagegen.profiles.service import (
+        profile_to_schema,
+    )
+
+    if settings is None:
+        settings = get_settings()
+
+    if base_path is None:
+        base_path = Path.cwd()
+
+    # Resolve profiles from filter
+    profiles = resolve_batch_profiles(session, filter_spec)
+
+    results: list[ProfileBuildResult] = []
+    succeeded = 0
+    failed = 0
+    cache_hits = 0
+    stopped_early = False
+
+    # Process explicitly specified profile IDs if they don't exist
+    missing_profile_ids: set[str] = set()
+    if filter_spec.profile_ids:
+        found_ids = {p.profile_id for p in profiles}
+        missing_profile_ids = set(filter_spec.profile_ids) - found_ids
+
+        # Add error results for missing profiles
+        for pid in missing_profile_ids:
+            result = ProfileBuildResult(
+                profile_id=pid,
+                success=False,
+                error_code="profile_not_found",
+                error_message=f"Profile not found: {pid}",
+            )
+            results.append(result)
+            failed += 1
+
+            if mode == BatchMode.FAIL_FAST:
+                stopped_early = True
+                break
+
+    # Process each profile
+    for profile in profiles:
+        if stopped_early:
+            break
+
+        profile_result = ProfileBuildResult(profile_id=profile.profile_id)
+
+        try:
+            # Convert to schema for build
+            profile_schema = profile_to_schema(profile)
+
+            # Ensure Image Builder is available
+            try:
+                imagebuilder = ensure_builder(
+                    session,
+                    release=profile.openwrt_release,
+                    target=profile.target,
+                    subtarget=profile.subtarget,
+                )
+            except Exception as e:
+                profile_result.error_code = "imagebuilder_error"
+                profile_result.error_message = str(e)
+                results.append(profile_result)
+                failed += 1
+
+                if mode == BatchMode.FAIL_FAST:
+                    stopped_early = True
+                continue
+
+            # Run the build
+            try:
+                build, is_cache_hit = build_or_reuse(
+                    session=session,
+                    profile=profile,
+                    profile_schema=profile_schema,
+                    imagebuilder=imagebuilder,
+                    settings=settings,
+                    force_rebuild=force_rebuild,
+                    extra_packages=extra_packages,
+                    build_options=build_options,
+                    base_path=base_path,
+                )
+
+                # Populate result
+                profile_result.build_id = build.id
+                profile_result.is_cache_hit = is_cache_hit
+                profile_result.log_path = build.log_path
+
+                if build.is_succeeded():
+                    profile_result.success = True
+                    succeeded += 1
+                    if is_cache_hit:
+                        cache_hits += 1
+
+                    # Get artifacts
+                    for artifact in build.artifacts:
+                        profile_result.artifacts.append(
+                            ArtifactInfo(
+                                filename=artifact.filename,
+                                relative_path=artifact.relative_path,
+                                size_bytes=artifact.size_bytes,
+                                sha256=artifact.sha256,
+                                kind=artifact.kind,
+                                labels=artifact.labels or [],
+                            )
+                        )
+                else:
+                    profile_result.success = False
+                    profile_result.error_code = build.error_type
+                    profile_result.error_message = build.error_message
+                    failed += 1
+
+                    if mode == BatchMode.FAIL_FAST:
+                        stopped_early = True
+
+            except (BuildServiceError, OverlayStagingError, BuildExecutionError) as e:
+                profile_result.error_code = getattr(e, "code", "build_error")
+                profile_result.error_message = str(e)
+                failed += 1
+
+                if mode == BatchMode.FAIL_FAST:
+                    stopped_early = True
+
+        except Exception as e:
+            logger.exception("Unexpected error building profile %s", profile.profile_id)
+            profile_result.error_code = "unexpected_error"
+            profile_result.error_message = str(e)
+            failed += 1
+
+            if mode == BatchMode.FAIL_FAST:
+                stopped_early = True
+
+        results.append(profile_result)
+
+    return BatchBuildResult(
+        total=len(results),
+        succeeded=succeeded,
+        failed=failed,
+        cache_hits=cache_hits,
+        mode=mode.value,
+        stopped_early=stopped_early,
+        results=[r.to_dict() for r in results],
+    )
+
+
 __all__ = [
+    "BatchBuildFilter",
+    "BatchBuildResult",
     "BuildNotFoundError",
     "BuildServiceError",
     "CacheConflictError",
+    "ProfileBuildResult",
+    "build_batch",
     "build_lock",
     "build_or_reuse",
     "get_build",
     "get_build_artifacts",
     "get_build_or_none",
     "list_builds",
+    "resolve_batch_profiles",
 ]

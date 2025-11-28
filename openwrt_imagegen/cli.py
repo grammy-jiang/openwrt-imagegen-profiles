@@ -591,6 +591,134 @@ def build_run(
     raise typer.Exit(code=1)
 
 
+@builds_app.command("batch")
+def build_batch_cmd(
+    profile_ids: Annotated[
+        list[str] | None,
+        typer.Option("--profile", "-p", help="Profile ID(s) to build"),
+    ] = None,
+    device_id: Annotated[
+        str | None,
+        typer.Option("--device", "-d", help="Filter by device ID"),
+    ] = None,
+    release: Annotated[
+        str | None,
+        typer.Option("--release", "-r", help="Filter by OpenWrt release"),
+    ] = None,
+    target: Annotated[
+        str | None,
+        typer.Option("--target", "-t", help="Filter by target"),
+    ] = None,
+    subtarget: Annotated[
+        str | None,
+        typer.Option("--subtarget", "-s", help="Filter by subtarget"),
+    ] = None,
+    tags: Annotated[
+        list[str] | None,
+        typer.Option("--tag", help="Filter by tag (can be repeated)"),
+    ] = None,
+    mode: Annotated[
+        str,
+        typer.Option(
+            "--mode", "-m", help="Batch mode: fail-fast or best-effort (default)"
+        ),
+    ] = "best-effort",
+    force: Annotated[
+        bool,
+        typer.Option("--force", "-f", help="Force rebuild even if cached"),
+    ] = False,
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Output as JSON"),
+    ] = False,
+) -> None:
+    """Build images for multiple profiles.
+
+    Select profiles by explicit IDs or filters (release, target, tags, etc.).
+    Use --mode=fail-fast to stop on first failure, or --mode=best-effort to
+    continue building remaining profiles after failures.
+    """
+    from openwrt_imagegen.builds.service import (
+        BatchBuildFilter,
+        build_batch,
+    )
+    from openwrt_imagegen.db import create_all_tables, get_engine, get_session_factory
+    from openwrt_imagegen.types import BatchMode
+
+    # Validate mode
+    try:
+        batch_mode = BatchMode(mode)
+    except ValueError:
+        console.print(f"[red]Invalid mode: {mode}[/red]")
+        console.print("Valid values: fail-fast, best-effort")
+        raise typer.Exit(code=1) from None
+
+    # Validate at least one filter is provided
+    if not any([profile_ids, device_id, release, target, subtarget, tags]):
+        console.print("[red]Error: At least one filter must be specified[/red]")
+        console.print(
+            "Use --profile, --device, --release, --target, --subtarget, or --tag"
+        )
+        raise typer.Exit(code=1)
+
+    engine = get_engine()
+    create_all_tables(engine)
+    factory = get_session_factory(engine)
+
+    with factory() as session:
+        filter_spec = BatchBuildFilter(
+            profile_ids=profile_ids,
+            device_id=device_id,
+            openwrt_release=release,
+            target=target,
+            subtarget=subtarget,
+            tags=tags,
+        )
+
+        if not json_output:
+            console.print("[blue]Starting batch build...[/blue]")
+
+        result = build_batch(
+            session=session,
+            filter_spec=filter_spec,
+            mode=batch_mode,
+            force_rebuild=force,
+        )
+        session.commit()
+
+        if json_output:
+            console.print(result.model_dump_json(indent=2))
+        else:
+            # Human-readable output
+            console.print()
+            console.print("[bold]Batch Build Results:[/bold]")
+            console.print(f"  Total profiles: {result.total}")
+            console.print(f"  [green]Succeeded: {result.succeeded}[/green]")
+            console.print(f"  [blue]Cache hits: {result.cache_hits}[/blue]")
+            if result.failed > 0:
+                console.print(f"  [red]Failed: {result.failed}[/red]")
+            if result.stopped_early:
+                console.print("  [yellow]Stopped early (fail-fast mode)[/yellow]")
+
+            console.print()
+            console.print("[bold]Per-Profile Results:[/bold]")
+            for r in result.results:
+                pid = r["profile_id"]
+                if r["success"]:
+                    hit_marker = " (cache hit)" if r["is_cache_hit"] else ""
+                    console.print(f"  [green]✓ {pid}{hit_marker}[/green]")
+                    if r["artifacts"]:
+                        for a in r["artifacts"]:
+                            console.print(f"      {a['filename']}")
+                else:
+                    console.print(f"  [red]✗ {pid}[/red]")
+                    if r["error_message"]:
+                        console.print(f"      Error: {r['error_message']}")
+
+        if result.failed > 0:
+            raise typer.Exit(code=1)
+
+
 @builds_app.command("list")
 def builds_list() -> None:
     """List build records."""
