@@ -6,3 +6,7 @@ This module handles:
 - Query APIs (by profile_id, tag, release, target/subtarget)
 - Profile CRUD operations
 """
+
+from openwrt_imagegen.profiles.models import Profile
+
+__all__ = ["Profile"]

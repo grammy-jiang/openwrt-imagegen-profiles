@@ -38,10 +38,17 @@ The package structure:
   - `__init__.py`: package metadata and version
   - `types.py`: shared type definitions (enums, dataclasses, TypedDicts)
   - `config.py`: pydantic Settings for configuration
+  - `db.py`: SQLAlchemy engine, session management, and Base model
   - `cli.py`: Typer-based CLI with subcommands
   - `__main__.py`: entry point for `python -m openwrt_imagegen`
-  - `imagebuilder/`, `profiles/`, `builds/`, `flash/`: subpackages (skeleton)
+  - `imagebuilder/models.py`: ImageBuilder ORM model
+  - `profiles/models.py`: Profile ORM model
+  - `builds/models.py`: BuildRecord and Artifact ORM models
+  - `flash/models.py`: FlashRecord ORM model
   - `py.typed`: marker for typed package
+- `alembic/`: Database migration scripts
+  - `env.py`: Alembic environment configuration
+  - `versions/`: Migration files
 - `tests/`: test files mirroring package structure
 
 When adding real code, follow `docs/ARCHITECTURE.md` and `docs/AI_CONTRIBUTING.md`:
@@ -92,7 +99,22 @@ The Python package and tooling are now available. Use these commands:
      ```
    - Tests must not depend on real OpenWrt downloads or real block devices; use fakes/mocks and temp dirs.
 
-4. CLI smoke test
+4. Database migrations
+
+   - Run Alembic migrations to create/update the database schema:
+     ```bash
+     uv run alembic upgrade head
+     ```
+   - Create a new migration after changing ORM models:
+     ```bash
+     uv run alembic revision --autogenerate -m "Description of changes"
+     ```
+   - Check current migration status:
+     ```bash
+     uv run alembic current
+     ```
+
+5. CLI smoke test
 
    - The minimal CLI works offline:
      ```bash
@@ -101,7 +123,7 @@ The Python package and tooling are now available. Use these commands:
      uv run python -m openwrt_imagegen config --json
      ```
 
-5. Tox (optional, if introduced)
+6. Tox (optional, if introduced)
    - Mirror CI by running:
      ```bash
      uv run tox -e lint,type,test,coverage
