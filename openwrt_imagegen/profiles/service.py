@@ -577,6 +577,8 @@ def export_profiles_to_directory(
         raise ValueError(f"Unsupported format '{format}'. Use 'yaml' or 'json'")
 
     directory.mkdir(parents=True, exist_ok=True)
+    # Resolve directory path for security comparison
+    resolved_directory = directory.resolve()
 
     if profile_ids:
         profiles = [get_profile(session, pid) for pid in profile_ids]
@@ -604,6 +606,14 @@ def export_profiles_to_directory(
             safe_id = f"profile_{profile.id}"
         filename = safe_id + ext
         path = directory / filename
+
+        # Security check: ensure the resolved path is within the target directory
+        # This prevents path traversal even if sanitization misses something
+        resolved_path = path.resolve()
+        if not str(resolved_path).startswith(str(resolved_directory)):
+            raise ValueError(
+                f"Path traversal detected: {filename} would escape target directory"
+            )
 
         if format == "yaml":
             export_profile_to_yaml(schema, path)

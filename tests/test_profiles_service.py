@@ -589,3 +589,54 @@ class TestValidateProfileData:
         with pytest.raises(ValueError) as exc_info:
             validate_profile_data(data)
         assert "allow_snapshot" in str(exc_info.value)
+
+
+class TestPathTraversalProtection:
+    """Test path traversal protections in export functionality."""
+
+    def test_export_sanitizes_special_characters(
+        self, session, tmp_path, minimal_profile_data
+    ):
+        """Should sanitize special characters in profile_id for filename."""
+        # Create a profile with special characters
+        data = minimal_profile_data.copy()
+        data["profile_id"] = "test.with-special_chars"
+        data["name"] = "Special Chars Test"
+        schema = ProfileSchema.model_validate(data)
+        create_profile(session, schema)
+        session.commit()
+
+        output_dir = tmp_path / "exports"
+        count = export_profiles_to_directory(session, output_dir)
+
+        assert count == 1
+        # Should have created a safe filename
+        files = list(output_dir.glob("*.yaml"))
+        assert len(files) == 1
+
+    def test_export_handles_path_separators(
+        self, session, tmp_path, minimal_profile_data
+    ):
+        """Should safely handle profile_ids that might look like paths.
+
+        Note: The profile_id pattern validation already prevents most path
+        traversal attempts, but the export function has additional sanitization.
+        """
+        # Create profile with dots (allowed in profile_id)
+        data = minimal_profile_data.copy()
+        data["profile_id"] = "test..dots..in..name"
+        data["name"] = "Dots Test"
+        schema = ProfileSchema.model_validate(data)
+        create_profile(session, schema)
+        session.commit()
+
+        output_dir = tmp_path / "exports"
+        count = export_profiles_to_directory(session, output_dir)
+
+        assert count == 1
+        # File should be created within the target directory
+        files = list(output_dir.glob("*.yaml"))
+        assert len(files) == 1
+        # Verify the file is within the expected directory
+        for f in files:
+            assert f.parent.resolve() == output_dir.resolve()
