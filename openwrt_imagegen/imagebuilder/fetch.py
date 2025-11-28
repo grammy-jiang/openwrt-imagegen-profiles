@@ -337,7 +337,16 @@ def extract_archive(
         if suffixes.endswith(".tar.xz") or suffixes.endswith(".tar.zst"):
             # For .tar.zst, we need to use a different approach
             if suffixes.endswith(".tar.zst"):
-                # Try using the system's tar command which supports zstd
+                # Security: Validate paths before subprocess call
+                # archive_path and dest_dir are Path objects from controlled sources
+                # (cache_dir from settings, not user input)
+                if not archive_path.is_absolute() or not dest_dir.is_absolute():
+                    raise ExtractionError(
+                        "Archive path and destination must be absolute paths",
+                        code="path_error",
+                    )
+
+                # Use system tar command for zstd support (not shell=True, list args)
                 import subprocess
 
                 result = subprocess.run(
