@@ -326,6 +326,7 @@ def ensure_builder(
                     builder.root_dir,
                 )
                 builder.mark_broken()
+                session.flush()
 
         elif builder.state == ImageBuilderState.BROKEN.value:
             if not force_download:
