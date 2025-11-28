@@ -29,6 +29,8 @@ def get_engine(db_url: str | None = None) -> Any:
     Returns:
         SQLAlchemy Engine instance.
     """
+    from pathlib import Path
+
     if db_url is None:
         settings = get_settings()
         db_url = settings.db_url
@@ -37,6 +39,10 @@ def get_engine(db_url: str | None = None) -> Any:
     connect_args: dict[str, Any] = {}
     if db_url.startswith("sqlite"):
         connect_args["check_same_thread"] = False
+        # Ensure the parent directory exists for SQLite
+        if db_url.startswith("sqlite:///"):
+            db_path = Path(db_url.replace("sqlite:///", ""))
+            db_path.parent.mkdir(parents=True, exist_ok=True)
 
     return create_engine(
         db_url,
