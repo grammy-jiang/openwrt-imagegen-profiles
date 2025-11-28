@@ -7,8 +7,9 @@ database persistence.
 See docs/ARCHITECTURE.md and docs/PROFILES.md for design context.
 """
 
+import re
 from collections.abc import Sequence
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -208,7 +209,7 @@ def update_profile_from_schema(profile: Profile, schema: ProfileSchema) -> None:
     profile.add_local_key = schema.add_local_key
     profile.notes = schema.notes
     # created_by is not updated on existing profiles
-    profile.updated_at = datetime.now()
+    profile.updated_at = datetime.now(timezone.utc)
 
 
 # CRUD Operations
@@ -593,8 +594,6 @@ def export_profiles_to_directory(
         # Sanitize profile_id for safe filename:
         # - Replace path separators and control characters
         # - Prevent path traversal with ".."
-        import re
-
         safe_id = profile.profile_id
         # Replace any character that could cause path issues
         safe_id = re.sub(r"[/\\:\*\?\"\<\>\|\x00-\x1f]", "_", safe_id)

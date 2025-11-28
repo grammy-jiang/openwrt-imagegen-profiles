@@ -4,6 +4,7 @@ This module provides the command-line interface using Typer.
 All business logic is delegated to core modules.
 """
 
+import json
 from typing import Annotated
 
 import typer
@@ -114,8 +115,6 @@ def profiles_list(
             return
 
         if json_output:
-            import json
-
             output = [
                 profile_to_schema(p).model_dump(exclude_none=True) for p in profiles
             ]
