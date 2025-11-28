@@ -3,7 +3,7 @@ profile_id: home.ap-bedroom.23.05
 name: Home AP (Bedroom, 23.05)
 
 device_id: home-ap-bedroom
-tags: [home, ap, wifi, 23.05, bedroom]
+tags: [home, ap, wifi, "23.05", bedroom]
 
 openwrt_release: "23.05.2"
 target: ath79

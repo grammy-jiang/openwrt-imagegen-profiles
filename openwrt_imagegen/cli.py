@@ -4,6 +4,7 @@ This module provides the command-line interface using Typer.
 All business logic is delegated to core modules.
 """
 
+import json
 from typing import Annotated
 
 import typer
@@ -89,19 +90,234 @@ app.add_typer(profiles_app, name="profiles")
 
 
 @profiles_app.command("list")
-def profiles_list() -> None:
-    """List all profiles."""
-    console.print("[yellow]Not yet implemented[/yellow]")
-    raise typer.Exit(code=1)
+def profiles_list(
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Output as JSON"),
+    ] = False,
+) -> None:
+    """List all profiles in the database."""
+    from openwrt_imagegen.db import create_all_tables, get_engine, get_session_factory
+    from openwrt_imagegen.profiles.service import list_profiles, profile_to_schema
+
+    engine = get_engine()
+    create_all_tables(engine)
+    factory = get_session_factory(engine)
+
+    with factory() as session:
+        profiles = list_profiles(session)
+
+        if not profiles:
+            if json_output:
+                console.print("[]")
+            else:
+                console.print("[yellow]No profiles found[/yellow]")
+            return
+
+        if json_output:
+            output = [
+                profile_to_schema(p).model_dump(exclude_none=True) for p in profiles
+            ]
+            console.print(json.dumps(output, indent=2))
+        else:
+            console.print(f"[bold]Found {len(profiles)} profile(s):[/bold]")
+            console.print()
+            for p in profiles:
+                console.print(f"  [green]{p.profile_id}[/green]")
+                console.print(f"    Name: {p.name}")
+                console.print(f"    Device: {p.device_id}")
+                console.print(
+                    f"    Target: {p.openwrt_release}/{p.target}/{p.subtarget}"
+                )
+                if p.tags:
+                    console.print(f"    Tags: {', '.join(p.tags)}")
+                console.print()
 
 
 @profiles_app.command("show")
 def profiles_show(
     profile_id: Annotated[str, typer.Argument(help="Profile ID to show")],
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Output as JSON"),
+    ] = False,
 ) -> None:
     """Show details of a specific profile."""
-    console.print(f"[yellow]Not yet implemented: show profile {profile_id}[/yellow]")
-    raise typer.Exit(code=1)
+    from openwrt_imagegen.db import create_all_tables, get_engine, get_session_factory
+    from openwrt_imagegen.profiles.service import (
+        ProfileNotFoundError,
+        get_profile,
+        profile_to_schema,
+    )
+
+    engine = get_engine()
+    create_all_tables(engine)
+    factory = get_session_factory(engine)
+
+    with factory() as session:
+        try:
+            profile = get_profile(session, profile_id)
+        except ProfileNotFoundError:
+            console.print(f"[red]Profile not found: {profile_id}[/red]")
+            raise typer.Exit(code=1) from None
+
+        schema = profile_to_schema(profile, include_meta=True)
+
+        if json_output:
+            console.print(schema.model_dump_json(indent=2, exclude_none=True))
+        else:
+            from openwrt_imagegen.profiles.io import profile_to_yaml_string
+
+            console.print(profile_to_yaml_string(schema))
+
+
+@profiles_app.command("import")
+def profiles_import(
+    path: Annotated[str, typer.Argument(help="Path to profile file or directory")],
+    update: Annotated[
+        bool,
+        typer.Option("--update", "-u", help="Update existing profiles"),
+    ] = False,
+    pattern: Annotated[
+        str,
+        typer.Option("--pattern", "-p", help="Glob pattern for directory import"),
+    ] = "*.yaml",
+) -> None:
+    """Import profiles from YAML/JSON file(s)."""
+    from pathlib import Path
+
+    from openwrt_imagegen.db import create_all_tables, get_engine, get_session_factory
+    from openwrt_imagegen.profiles.service import (
+        import_profile_from_file,
+        import_profiles_from_directory,
+    )
+
+    file_path = Path(path)
+    if not file_path.exists():
+        console.print(f"[red]Path not found: {path}[/red]")
+        raise typer.Exit(code=1)
+
+    engine = get_engine()
+    create_all_tables(engine)
+    factory = get_session_factory(engine)
+
+    with factory() as session:
+        if file_path.is_dir():
+            result = import_profiles_from_directory(
+                session, file_path, pattern=pattern, update_existing=update
+            )
+            session.commit()
+
+            console.print("[bold]Import results:[/bold]")
+            console.print(f"  Total: {result.total}")
+            console.print(f"  [green]Succeeded: {result.succeeded}[/green]")
+            if result.failed > 0:
+                console.print(f"  [red]Failed: {result.failed}[/red]")
+                for r in result.results:
+                    if not r.success:
+                        console.print(f"    - {r.profile_id}: {r.error}")
+                raise typer.Exit(code=1)
+        else:
+            single_result = import_profile_from_file(
+                session, file_path, update_existing=update
+            )
+            session.commit()
+
+            if single_result.success:
+                action = "Created" if single_result.created else "Updated"
+                console.print(
+                    f"[green]{action} profile: {single_result.profile_id}[/green]"
+                )
+            else:
+                console.print(f"[red]Failed: {single_result.error}[/red]")
+                raise typer.Exit(code=1)
+
+
+@profiles_app.command("export")
+def profiles_export(
+    path: Annotated[str, typer.Argument(help="Output path (file or directory)")],
+    profile_id: Annotated[
+        str | None,
+        typer.Option("--profile", "-p", help="Profile ID to export (for single file)"),
+    ] = None,
+    format: Annotated[
+        str,
+        typer.Option("--format", "-f", help="Output format for directory export"),
+    ] = "yaml",
+    include_meta: Annotated[
+        bool,
+        typer.Option("--include-meta", help="Include metadata in export"),
+    ] = False,
+) -> None:
+    """Export profiles to YAML/JSON file(s)."""
+    from pathlib import Path
+
+    from openwrt_imagegen.db import create_all_tables, get_engine, get_session_factory
+    from openwrt_imagegen.profiles.service import (
+        ProfileNotFoundError,
+        export_profile_to_file,
+        export_profiles_to_directory,
+    )
+
+    output_path = Path(path)
+    engine = get_engine()
+    create_all_tables(engine)
+    factory = get_session_factory(engine)
+
+    with factory() as session:
+        try:
+            if profile_id:
+                # Export single profile
+                export_profile_to_file(
+                    session, profile_id, output_path, include_meta=include_meta
+                )
+                console.print(f"[green]Exported {profile_id} to {path}[/green]")
+            else:
+                # Export all profiles to directory
+                count = export_profiles_to_directory(
+                    session, output_path, format=format, include_meta=include_meta
+                )
+                console.print(f"[green]Exported {count} profile(s) to {path}[/green]")
+        except ProfileNotFoundError as e:
+            console.print(f"[red]Profile not found: {e.profile_id}[/red]")
+            raise typer.Exit(code=1) from None
+        except ValueError as e:
+            console.print(f"[red]Error: {e}[/red]")
+            raise typer.Exit(code=1) from None
+
+
+@profiles_app.command("validate")
+def profiles_validate(
+    path: Annotated[str, typer.Argument(help="Path to profile file to validate")],
+) -> None:
+    """Validate a profile file without importing."""
+    from pathlib import Path
+
+    from pydantic import ValidationError
+
+    from openwrt_imagegen.profiles.io import load_profile
+
+    file_path = Path(path)
+    if not file_path.exists():
+        console.print(f"[red]File not found: {path}[/red]")
+        raise typer.Exit(code=1)
+
+    try:
+        profile = load_profile(file_path)
+        profile.validate_snapshot_policy()
+        console.print(f"[green]✓ Valid profile: {profile.profile_id}[/green]")
+        console.print(f"  Name: {profile.name}")
+        console.print(f"  Device: {profile.device_id}")
+        console.print(
+            f"  Target: {profile.openwrt_release}/{profile.target}/{profile.subtarget}"
+        )
+    except ValidationError as e:
+        console.print("[red]Validation failed:[/red]")
+        console.print(str(e))
+        raise typer.Exit(code=1) from None
+    except ValueError as e:
+        console.print(f"[red]Validation failed: {e}[/red]")
+        raise typer.Exit(code=1) from None
 
 
 builders_app = typer.Typer(help="Manage Image Builder cache")
