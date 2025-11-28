@@ -344,6 +344,64 @@ class TestExtractArchive:
 
         assert exc_info.value.code == "unsupported_format"
 
+    def test_extract_tar_xz_path_traversal_absolute(self, tmp_path):
+        """Should reject .tar.xz archives with absolute paths."""
+        import lzma
+
+        archive_path = tmp_path / "malicious.tar.xz"
+
+        # Create tar with absolute path
+        tar_bytes = BytesIO()
+        with tarfile.open(fileobj=tar_bytes, mode="w") as tar:
+            info = tarfile.TarInfo(name="/etc/passwd")
+            info.size = 4
+            tar.addfile(info, BytesIO(b"test"))
+
+        tar_bytes.seek(0)
+        with lzma.open(archive_path, "wb") as xz_file:
+            xz_file.write(tar_bytes.read())
+
+        dest_dir = tmp_path / "extracted"
+        with pytest.raises(ExtractionError) as exc_info:
+            extract_archive(archive_path, dest_dir)
+
+        assert exc_info.value.code == "path_traversal"
+
+    def test_extract_tar_xz_path_traversal_dotdot(self, tmp_path):
+        """Should reject .tar.xz archives with .. path components."""
+        import lzma
+
+        archive_path = tmp_path / "malicious.tar.xz"
+
+        # Create tar with path traversal
+        tar_bytes = BytesIO()
+        with tarfile.open(fileobj=tar_bytes, mode="w") as tar:
+            info = tarfile.TarInfo(name="../../../etc/passwd")
+            info.size = 4
+            tar.addfile(info, BytesIO(b"test"))
+
+        tar_bytes.seek(0)
+        with lzma.open(archive_path, "wb") as xz_file:
+            xz_file.write(tar_bytes.read())
+
+        dest_dir = tmp_path / "extracted"
+        with pytest.raises(ExtractionError) as exc_info:
+            extract_archive(archive_path, dest_dir)
+
+        assert exc_info.value.code == "path_traversal"
+
+    def test_extract_tar_zst_relative_path(self, tmp_path):
+        """Should reject .tar.zst extraction with relative paths."""
+        archive_path = tmp_path / "test.tar.zst"
+        archive_path.write_bytes(b"fake content")
+
+        # Use a relative path - should fail path validation
+        dest_dir = Path("relative/path")
+        with pytest.raises(ExtractionError) as exc_info:
+            extract_archive(archive_path, dest_dir)
+
+        assert exc_info.value.code == "path_error"
+
 
 class TestPruneBuilder:
     """Tests for prune_builder function."""

@@ -520,6 +520,18 @@ class TestPruneBuilders:
             if builder.state == ImageBuilderState.DEPRECATED.value:
                 assert Path(builder.root_dir).exists()
 
+    def test_prune_mutually_exclusive_options(self, session, mock_settings):
+        """Should raise ValueError when both deprecated_only and unused_days are specified."""
+        with pytest.raises(ValueError) as exc_info:
+            prune_builders(
+                session,
+                deprecated_only=True,
+                unused_days=30,
+                settings=mock_settings,
+            )
+
+        assert "Cannot specify both" in str(exc_info.value)
+
 
 class TestGetBuilderCacheInfo:
     """Tests for get_builder_cache_info function."""

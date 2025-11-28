@@ -307,6 +307,32 @@ def fetch_checksums(
         ) from e
 
 
+def _verify_extraction_contained(dest_dir: Path) -> None:
+    """Verify that all extracted files are within the destination directory.
+
+    This is a post-extraction security check for subprocess-based extraction
+    where we can't pre-validate archive contents.
+
+    Args:
+        dest_dir: The intended extraction destination.
+
+    Raises:
+        ExtractionError: If any symlink points outside the destination.
+    """
+    dest_dir_resolved = dest_dir.resolve()
+    for item in dest_dir.rglob("*"):
+        # Check symlinks don't escape the destination
+        if item.is_symlink():
+            target = item.resolve()
+            try:
+                target.relative_to(dest_dir_resolved)
+            except ValueError:
+                raise ExtractionError(
+                    f"Symlink {item} points outside destination: {target}",
+                    code="path_traversal",
+                ) from None
+
+
 def extract_archive(
     archive_path: Path,
     dest_dir: Path,
@@ -346,11 +372,20 @@ def extract_archive(
                         code="path_error",
                     )
 
-                # Use system tar command for zstd support (not shell=True, list args)
+                # Use system tar command for zstd support with path traversal protection
+                # --no-absolute-names: strip leading '/' from member names
+                # Note: GNU tar also prevents '..' traversal by default
                 import subprocess
 
                 result = subprocess.run(
-                    ["tar", "-xf", str(archive_path), "-C", str(dest_dir)],
+                    [
+                        "tar",
+                        "--no-absolute-names",
+                        "-xf",
+                        str(archive_path),
+                        "-C",
+                        str(dest_dir),
+                    ],
                     capture_output=True,
                     text=True,
                     check=False,
@@ -360,6 +395,9 @@ def extract_archive(
                         f"Failed to extract {archive_path}: {result.stderr}",
                         code="tar_error",
                     )
+
+                # Additional security check: verify no files escaped dest_dir
+                _verify_extraction_contained(dest_dir)
             else:
                 # Handle .tar.xz archives
                 with tarfile.open(archive_path, "r:xz") as tar:

@@ -146,6 +146,7 @@ def builder_lock(
     logger.debug("Acquiring lock for %s/%s/%s", release, target, subtarget)
 
     fd = os.open(str(lock_file), os.O_RDWR | os.O_CREAT, 0o600)
+    lock_acquired = False
     try:
         if timeout is not None:
             # Non-blocking with timeout
@@ -155,6 +156,7 @@ def builder_lock(
             while True:
                 try:
                     fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    lock_acquired = True
                     break
                 except BlockingIOError as e:
                     if time.monotonic() - start >= timeout:
@@ -165,13 +167,15 @@ def builder_lock(
         else:
             # Blocking
             fcntl.flock(fd, fcntl.LOCK_EX)
+            lock_acquired = True
 
         logger.debug("Lock acquired for %s/%s/%s", release, target, subtarget)
         yield
     finally:
-        fcntl.flock(fd, fcntl.LOCK_UN)
+        if lock_acquired:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+            logger.debug("Lock released for %s/%s/%s", release, target, subtarget)
         os.close(fd)
-        logger.debug("Lock released for %s/%s/%s", release, target, subtarget)
 
 
 def _get_builder(
@@ -451,14 +455,25 @@ def prune_builders(
         session: Database session.
         deprecated_only: Only prune deprecated builders (safe prune).
         unused_days: Prune builders not used for this many days (aggressive).
+            Mutually exclusive with deprecated_only when deprecated_only=True.
         settings: Application settings.
         dry_run: If True, only report what would be pruned.
 
     Returns:
         List of (release, target, subtarget) tuples that were/would be pruned.
+
+    Raises:
+        ValueError: If both deprecated_only=True and unused_days is provided.
     """
     if settings is None:
         settings = get_settings()
+
+    # Validate mutually exclusive options
+    if deprecated_only and unused_days is not None:
+        raise ValueError(
+            "Cannot specify both deprecated_only=True and unused_days. "
+            "Use deprecated_only=False to prune by unused_days."
+        )
 
     pruned: list[tuple[str, str, str]] = []
 
