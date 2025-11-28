@@ -1,166 +1,89 @@
 # Copilot Instructions for `openwrt-imagegen-profiles`
 
-These instructions are the **entrypoint for AI coding agents** in this repo. They summarize what the project is, where things live, and how to work effectively without running into broken commands or CI surprises.
+These instructions guide AI coding agents working in this repository. Focus on repeatable OpenWrt Image Builder workflows and Python tooling around them.
 
-Always read and trust this file first. Only search the repo if something here is missing or clearly out of date.
+## 1. Big-picture architecture
 
----
+- This repo is about **declarative device profiles** + **Python orchestration** around the official **OpenWrt Image Builder**, _not_ a generic OpenWrt SDK.
+- Treat **profiles as data, Python as logic**:
+  - Profiles encode targets, subtargets, Image Builder profile names, releases, packages, and optional overlays.
+  - Python code is responsible for reading profiles, composing Image Builder CLI invocations, collecting artifacts, and logging.
+- Expect a future split between:
+  - A **Python CLI layer** (for local/CI usage).
+  - An optional **service/MCP layer** that calls the same Python functions without duplicating business logic.
 
-## 1. What this repository is
+When in doubt, keep build/flash behavior in reusable Python modules and let CLIs/services be thin wrappers.
 
-- Purpose: design and profiles for a future **Python orchestration layer** around the official **OpenWrt Image Builder**, plus safe TF/SD card flashing.
-- Current status: **design‑heavy, code‑light**.
-  - There is **no `openwrt_imagegen/` Python package yet**.
-  - There are **no Python files or tests**, and **no CI workflows** in `.github/workflows/`.
-  - The only code‑adjacent artifacts are:
-    - `docs/*.md` – architecture, build pipeline, safety, DB models, AI rules.
-    - `profiles/*.yaml` – example on‑disk profile definitions and overlays.
-- Target stack (planned, not fully implemented):
-  - Python ≥ 3.10, packaged via `pyproject.toml`.
-  - Core package `openwrt_imagegen/` with subpackages: `imagebuilder`, `profiles`, `builds`, `flash`.
-  - Thin frontends: CLI (`python -m openwrt_imagegen`), optional web app, optional MCP server.
+## 2. Conventions and design principles
 
-**Summary:** treat this repo as a **specification plus sample data** for an OpenWrt image‑build/flash orchestrator. When you add real code, you are turning the design into implementation; keep them in sync.
+- **Reproducibility first**
+  - Prefer explicit parameters (target, profile, release, packages) over implicit defaults or environment-dependent behavior.
+  - Avoid hidden state such as global config files or "current device" globals; pass explicit context objects or arguments.
+- **Profiles are immutable inputs**
+  - Do not mutate loaded profile objects in-place while building; derive new structures instead.
+  - Treat a profile as a snapshot that should deterministically yield the same build outputs.
+- **Separation of concerns**
+  - Parsing/validating profile data is separate from executing Image Builder commands.
+  - TF card flashing logic is separate from build logic but can share common types (e.g., image metadata, device identifiers).
+- **Safety over convenience**
+  - Any code that touches block devices (TF cards, disks) must:
+    - Require explicit device paths.
+    - Prefer dry-run and confirmation modes.
+    - Log what will be done before doing it.
 
----
+## 3. Project layout expectations
 
-## 2. Layout and where to make changes
+Even if some modules are not created yet, follow these patterns:
 
-Repo root (key files only):
+- `profiles/` (or similar future dir):
+  - Data-only definitions for devices (YAML/JSON/TOML).
+  - Keep schemas consistent; add validation helpers when patterns emerge.
+- `imagegen/` or `openwrt_imagegen/` (Python package):
+  - Core orchestration code for:
+    - Loading/validating profiles.
+    - Constructing Image Builder commands.
+    - Running builds and collecting artifacts/logs.
+- `cli.py` or `__main__.py`:
+  - Thin argparse/Typer/Click wrapper around the orchestration library.
 
-- `README.md` – high‑level project overview and links to other docs.
-- `docs/` – authoritative design docs:
-  - `ARCHITECTURE.md` – overall architecture, package layout, and responsibilities.
-  - `PROFILES.md` – profile schema and YAML examples.
-  - `BUILD_PIPELINE.md` – how builds, cache keys, and artifacts should work.
-  - `SAFETY.md` – TF/SD flashing safety rules.
-  - `DB_MODELS.md` – ORM model concepts and relationships.
-  - `FRONTENDS.md` – CLI/web/MCP responsibilities.
-  - `DEVELOPMENT.md` – bootstrap and coding‑style guidance.
-  - `AI_CONTRIBUTING.md` / `AI_WORKFLOW.md` – detailed AI rules and workflows.
-- `profiles/` – YAML examples and overlays only; these are **import/export formats**, not the primary source of truth once a DB exists.
-- `.github/copilot-instructions.md` – this file.
+If you introduce new modules, align them with this separation and keep UX-focused code (argument parsing, prompts) out of the core.
 
-When adding implementation code, follow the structure from `docs/ARCHITECTURE.md` and `docs/DEVELOPMENT.md`:
+## 4. External tools and integration points
 
-- Create `pyproject.toml` describing a Python ≥3.10 project named `openwrt-imagegen`.
-- Create `openwrt_imagegen/` with subpackages:
-  - `imagebuilder/` – Image Builder download/cache, metadata, and selection.
-  - `profiles/` – ORM models and profile CRUD/validation logic.
-  - `builds/` – build orchestration, cache keys, artifact discovery.
-  - `flash/` – TF/SD card flashing workflows obeying `SAFETY.md`.
-  - `__main__.py` / `cli.py` – thin CLI wired into the core APIs.
-- Create `tests/` mirroring that layout.
+- **OpenWrt Image Builder** is the authoritative build engine:
+  - Never reimplement package selection or firmware construction logic; always shell out to the official tool.
+  - Centralize command construction in one place so changes to Image Builder flags are easy to maintain.
+- **CI / automation**
+  - Design functions so they can be called non-interactively (no prompts, deterministic exits).
+  - Prefer explicit output directories and log paths that CI can collect as artifacts.
+- **Future MCP/service wrappers**
+  - Expose idempotent, side-effect-controlled functions (e.g., `build_image(profile, options)`, `flash_tf_card(image, device)`).
+  - Ensure return types include enough metadata (paths, checksums, logs) for higher layers to reason about state.
 
-Do **not** invent new top‑level directories for core logic unless you also update `docs/ARCHITECTURE.md` and this file.
+## 5. Developer workflows (expected)
 
----
+When adding scripts or docs, align with these workflows:
 
-## 3. Build, test, and run commands (current state)
+- **Build**
+  - Input: device profile ID or file path.
+  - Steps: load profile → validate → ensure Image Builder present → run build → collect images + logs into a predictable output tree (e.g., `builds/<device>/<release>/...`).
+- **Flash TF card (planned)**
+  - Input: built image + explicit block device path.
+  - Steps: verify image exists and matches device → optional dry-run/confirmation → write image → verify (e.g., checksum/read-back) → log operations.
 
-There is **no working build/test pipeline yet**. You must not assume any of the following exist until you create them:
+Document any non-obvious environment variables or paths near where they are used.
 
-- No `pyproject.toml`, `setup.cfg`, or `requirements.txt`.
-- No `pytest` configuration or test files.
-- No `ruff`, `black`, `flake8`, or mypy config files.
-- No GitHub Actions CI workflows.
+## 6. Coding style and quality
 
-Validated commands today (from repo root):
+- Use modern Python (3.10+) syntax and type hints where practical.
+- Prefer small, testable functions with explicit parameters over large scripts.
+- When adding new behaviors, add or update **self-checks or tests** alongside them (e.g., pytest-style tests or simple regression scripts in `tests/`).
 
-- Listing docs and profiles (for reference only):
+## 7. How AI agents should work here
 
-  - `ls docs` – shows all design documents.
-  - `ls profiles` – shows example YAML profile files and `profiles/overlays/`.
+- Before generating new functionality, scan `README.md` and existing Python modules for how profiles and builds are modeled; copy existing patterns instead of inventing new ones.
+- When unsure about a behavior (e.g., how to structure directories, how to name profiles), defer to clarity and reproducibility:
+  - E.g., prefer `device_id/release/build-<timestamp>`-style paths to opaque hashes.
+- Keep public interfaces stable: if you must change a function or CLI signature, update all call sites and, if present, docs/tests in the same change.
 
-- Viewing docs: any of
-
-  - `cat README.md`
-  - `less docs/ARCHITECTURE.md`
-  - `less docs/PROFILES.md`
-
-There are **no existing commands** for:
-
-- Bootstrapping a virtualenv.
-- Installing dependencies.
-- Running tests.
-- Building or running a CLI/web service.
-
-When you introduce the first runnable skeleton, follow `docs/DEVELOPMENT.md` and wire commands like:
-
-1. `python -m venv .venv` then `source .venv/bin/activate`.
-2. `pip install -e .[dev]` (once `pyproject.toml`/extras are created).
-3. `pytest` for tests.
-4. `python -m openwrt_imagegen --help` for a CLI smoke test.
-
-Always document any new commands you add by updating **both** `docs/DEVELOPMENT.md` and this file so future agents don’t need to rediscover them.
-
----
-
-## 4. Architectural rules for agents
-
-High‑level principles (see `docs/AI_CONTRIBUTING.md` for the full contract):
-
-- **Profiles are data; Python is logic.**
-  - Profiles describe targets, subtargets, Image Builder profiles, packages, overlays, and policies.
-  - Python code loads/validates profiles, computes cache keys, and runs Image Builder + flashing.
-- **Official OpenWrt Image Builder only.**
-  - Never re‑implement firmware build logic; always shell out to the official Image Builder.
-  - Centralize Image Builder invocation in one place in `openwrt_imagegen/imagebuilder/`.
-- **Database + ORM are the source of truth.**
-  - Profiles, Image Builders, builds, artifacts, and (optionally) flash records live in DB models.
-  - On‑disk YAML/JSON/TOML is for import/export.
-- **Frontends are thin.**
-  - CLI/web/MCP only parse inputs, call core APIs, and render results.
-  - No build/flash logic directly in frontends.
-- **Flashing is safety‑critical.**
-  - Follow `docs/SAFETY.md` and `docs/openwrt-tf-card-flashing-debugging.md`.
-  - Require explicit device paths (e.g. `/dev/sdX`, never guess).
-  - Support dry‑run, hashed read‑back verification, and clear logging.
-
-If code and docs ever disagree, treat **tested code** as authoritative, then update docs and this file in the same PR.
-
----
-
-## 5. How to work efficiently as an AI agent
-
-1. **Start with docs, not search.**
-   - Read `README.md`, then scan relevant files under `docs/` (especially `ARCHITECTURE.md`, `PROFILES.md`, `BUILD_PIPELINE.md`, `SAFETY.md`, `DB_MODELS.md`, `FRONTENDS.md`, `AI_CONTRIBUTING.md`, `AI_WORKFLOW.md`).
-2. **Locate the right layer.**
-   - Core logic: `openwrt_imagegen/…` (once created).
-   - Frontends: CLI/web/MCP entrypoints.
-   - Docs/tests: `docs/`, `tests/`.
-3. **Plan end‑to‑end changes.**
-   - For any behavioral change, update: core code → tests → docs → this file (if workflows or commands change).
-4. **Be conservative with shell commands.**
-   - Do not assume any Makefile or project‑specific scripts exist.
-   - Until you add them, limit shell usage to generic commands (listing files, running `python`, `pytest`, etc.).
-5. **Keep things reproducible.**
-   - Prefer explicit arguments (target/profile/release) over implicit environment state.
-   - Avoid hidden globals; pass context explicitly between functions.
-
-Only perform broader searches (`grep`, `find`, semantic search) when the information you need is **not already described** here or in `docs/DEVELOPMENT.md` / `docs/ARCHITECTURE.md`.
-
----
-
-## 6. Validation and CI expectations (future)
-
-There is currently **no CI configured** for this repo (no `.github/workflows/*.yml`). When you introduce real code, you should also:
-
-- Add a GitHub Actions workflow that mirrors local commands, e.g.:
-  - `pip install -e .[dev]`.
-  - `pytest`.
-  - `ruff check` / `black --check` if you adopt those tools.
-- Document those steps here, under a short “CI pipeline” note, once they exist.
-
-Until then, you can consider a change “validated” if:
-
-- All new/updated tests you add pass locally (via `pytest`).
-- Any doc examples you introduce are syntactically correct and consistent with the design docs.
-
-Keep this file and `docs/ARCHITECTURE.md` in sync whenever you:
-
-- Add the first real Python package or CLI.
-- Introduce tests or CI workflows.
-- Change how builds, profiles, or flashing are wired.
-
-This helps future AI agents avoid re‑discovering the same information or running failing commands.
+If anything in these instructions seems to conflict with the current code, follow the actual code and update this file to match reality rather than enforcing an outdated convention.
