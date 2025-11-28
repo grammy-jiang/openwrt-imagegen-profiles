@@ -588,8 +588,21 @@ def export_profiles_to_directory(
 
     for profile in profiles:
         schema = profile_to_schema(profile, include_meta=include_meta)
-        # Use profile_id as filename (sanitize if needed)
-        filename = profile.profile_id.replace("/", "_") + ext
+        # Sanitize profile_id for safe filename:
+        # - Replace path separators and control characters
+        # - Prevent path traversal with ".."
+        import re
+
+        safe_id = profile.profile_id
+        # Replace any character that could cause path issues
+        safe_id = re.sub(r"[/\\:\*\?\"\<\>\|\x00-\x1f]", "_", safe_id)
+        # Prevent path traversal
+        safe_id = safe_id.replace("..", "__")
+        # Ensure no leading/trailing dots or spaces
+        safe_id = safe_id.strip(". ")
+        if not safe_id:
+            safe_id = f"profile_{profile.id}"
+        filename = safe_id + ext
         path = directory / filename
 
         if format == "yaml":
