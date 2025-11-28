@@ -55,15 +55,30 @@ def config(
     if json_output:
         console.print(print_settings_json(settings))
     else:
+        tmp_dir_display = (
+            str(settings.tmp_dir) if settings.tmp_dir else "(system default)"
+        )
         console.print("[bold]Effective Configuration:[/bold]")
-        console.print(f"  Cache directory:    {settings.cache_dir}")
+        console.print()
+        console.print("[bold]Paths:[/bold]")
+        console.print(f"  Cache directory:     {settings.cache_dir}")
         console.print(f"  Artifacts directory: {settings.artifacts_dir}")
-        console.print(f"  Database URL:       {settings.db_url}")
-        console.print(f"  Offline mode:       {settings.offline}")
-        console.print(f"  Log level:          {settings.log_level}")
-        console.print(f"  Max downloads:      {settings.max_concurrent_downloads}")
-        console.print(f"  Max builds:         {settings.max_concurrent_builds}")
-        console.print(f"  Verification mode:  {settings.verification_mode}")
+        console.print(f"  Database URL:        {settings.db_url}")
+        console.print(f"  Temp directory:      {tmp_dir_display}")
+        console.print()
+        console.print("[bold]Operational:[/bold]")
+        console.print(f"  Offline mode:        {settings.offline}")
+        console.print(f"  Log level:           {settings.log_level}")
+        console.print(f"  Verification mode:   {settings.verification_mode}")
+        console.print()
+        console.print("[bold]Concurrency:[/bold]")
+        console.print(f"  Max downloads:       {settings.max_concurrent_downloads}")
+        console.print(f"  Max builds:          {settings.max_concurrent_builds}")
+        console.print()
+        console.print("[bold]Timeouts (seconds):[/bold]")
+        console.print(f"  Download timeout:    {settings.download_timeout}")
+        console.print(f"  Build timeout:       {settings.build_timeout}")
+        console.print(f"  Flash timeout:       {settings.flash_timeout}")
 
 
 # Placeholder subcommand groups for future implementation

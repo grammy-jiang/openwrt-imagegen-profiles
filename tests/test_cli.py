@@ -53,12 +53,60 @@ class TestCLIConfig:
         assert result.exit_code == 0
         assert "Cache directory" in result.stdout
 
+    def test_config_command_shows_all_settings(self) -> None:
+        """CLI config should show all configuration fields."""
+        result = runner.invoke(app, ["config"])
+        assert result.exit_code == 0
+        # Check all sections are present
+        assert "Paths:" in result.stdout
+        assert "Operational:" in result.stdout
+        assert "Concurrency:" in result.stdout
+        assert "Timeouts (seconds):" in result.stdout
+        # Check all fields are displayed
+        assert "Cache directory" in result.stdout
+        assert "Artifacts directory" in result.stdout
+        assert "Database URL" in result.stdout
+        assert "Temp directory" in result.stdout
+        assert "Offline mode" in result.stdout
+        assert "Log level" in result.stdout
+        assert "Verification mode" in result.stdout
+        assert "Max downloads" in result.stdout
+        assert "Max builds" in result.stdout
+        assert "Download timeout" in result.stdout
+        assert "Build timeout" in result.stdout
+        assert "Flash timeout" in result.stdout
+
     def test_config_json(self) -> None:
         """CLI config --json should output JSON."""
         result = runner.invoke(app, ["config", "--json"])
         assert result.exit_code == 0
         assert "{" in result.stdout
         assert "cache_dir" in result.stdout
+
+    def test_config_json_contains_all_fields(self) -> None:
+        """CLI config --json should contain all config fields."""
+        import json
+
+        result = runner.invoke(app, ["config", "--json"])
+        assert result.exit_code == 0
+        config_data = json.loads(result.stdout)
+        # Verify all expected keys are present
+        expected_keys = [
+            "cache_dir",
+            "artifacts_dir",
+            "db_url",
+            "tmp_dir",
+            "offline",
+            "log_level",
+            "max_concurrent_downloads",
+            "max_concurrent_builds",
+            "verification_mode",
+            "download_timeout",
+            "build_timeout",
+            "flash_timeout",
+        ]
+        for key in expected_keys:
+            assert key in config_data, f"Missing key: {key}"
 
 
 class TestCLISubcommands:
