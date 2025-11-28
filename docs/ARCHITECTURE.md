@@ -46,24 +46,46 @@ The goal is to make it easy for both humans and AI agents to request reproducibl
   - Discover official Image Builder URLs for `(release, target, subtarget)`.
   - Download/verify archives, extract to cache roots, record metadata, and manage cache pruning (see [BUILD_PIPELINE.md](BUILD_PIPELINE.md)).
   - Expose “ensure builder present” and cache state/query APIs.
+  - Key components:
+    - `models.py`: ORM `ImageBuilder` model (release, target, subtarget, urls, checksums, state, paths, timestamps).
+    - `fetch.py`: URL discovery, download with checksum/signature verification, extraction, pruning helpers.
+    - `service.py`: high-level functions `ensure_builder(...)`, `list_builders(...)`, `prune_builders(...)`, with locking.
 
 - `openwrt_imagegen/profiles/`
   - ORM models for profiles; validation and import/export (YAML/JSON/TOML).
   - Query APIs (by `profile_id`, tag, release, target/subtarget).
   - Profile CRUD (when enabled) with history/version-awareness where applicable.
+  - Key components:
+    - `models.py`: ORM `Profile` model.
+    - `schema.py`: Pydantic models for on-disk schema, validation.
+    - `io.py`: import/export helpers for YAML/JSON/TOML with validation and reporting.
+    - `service.py`: CRUD/query APIs, tag/filter search, batch selection resolution.
 
 - `openwrt_imagegen/builds/`
   - Build orchestration: cache-key computation, overlay staging, calling Image Builder, artifact discovery, manifest generation.
   - BuildRecord and Artifact ORM models; cache lookup and cache-hit handling.
   - Batch build orchestration (multi-profile) with per-profile results.
   - Concurrency controls and locking for builders and cache keys.
+  - Key components:
+    - `models.py`: ORM `BuildRecord`, `Artifact`, optional `BatchBuild`.
+    - `cache_key.py`: canonical input snapshot and hash computation (profiles, packages, overlays hash, builder, options).
+    - `overlay.py`: staging of FILES tree, hashing of staged content.
+    - `runner.py`: compose and execute Image Builder commands; capture logs.
+    - `artifacts.py`: discover outputs, classify kinds, hash, and write manifest.
+    - `service.py`: high-level `build_or_reuse(...)`, `build_batch(...)`, `list_builds(...)`, with locking and concurrency limits.
 
 - `openwrt_imagegen/flash/`
   - Flash workflows adhering to [SAFETY.md](SAFETY.md): device validation, optional wipe, write, hash verification, logging.
   - Optional FlashRecord model for audit trails.
+  - Key components:
+    - `models.py`: optional ORM `FlashRecord`.
+    - `device.py`: validation of block devices (whole-device only), optional metadata via pyudev.
+    - `writer.py`: wipe (when requested), write with fsync, hash verification (full/prefix).
+    - `service.py`: high-level `flash_artifact(...)` / `flash_image(...)` with dry-run and force flags.
 
 - `openwrt_imagegen/config.py`
   - Config/env parsing (pydantic), defaults for paths (cache/artifacts/DB/tmp), and feature toggles (offline mode, concurrency limits).
+  - Expose a single `Settings` object and helper to render effective config as JSON.
 
 - `openwrt_imagegen/__main__.py` or `cli.py`
   - Thin CLI that delegates to the above modules; argument parsing only.
@@ -99,6 +121,12 @@ Data flow (flash request):
 2. Validate device path (whole-device only).
 3. Optional wipe; write with fsync; verify hash (full or prefix).
 4. Log and persist flash record (if model exists); return status and log path.
+
+Sequence (batch build request):
+1. Resolve profile set (explicit list or filter) and persist the resolved list.
+2. For each profile: ensure builder, compute cache key, acquire lock.
+3. Reuse cached builds when present; queue new builds respecting concurrency limits.
+4. Aggregate per-profile results (status, cache_hit, artifacts, log path) and batch status (fail-fast vs best-effort).
 
 ---
 
@@ -137,6 +165,7 @@ Data flow (flash request):
 - Errors: typed exceptions with stable codes (see [OPERATIONS.md](OPERATIONS.md)); surface in CLI/web/MCP outputs with `code`, `message`, `log_path`.
 - Manifests: each build writes a manifest (JSON) containing inputs, artifacts, hashes, and cache key to aid debugging and reuse.
 - Metrics (optional): add hooks for counters/timers (downloads, cache hits/misses, build duration, flash verification failures) if/when a metrics backend is chosen.
+- Tracing/logging consistency: include request IDs in web/MCP surfaces and propagate through core calls for correlation.
 
 ---
 

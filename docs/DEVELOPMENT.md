@@ -9,7 +9,7 @@ This repository is currently design-heavy: the core Python package has not been 
 
 ## 2) Bootstrap checklist (first runnable skeleton)
 - Create `pyproject.toml` (Python >=3.10) with minimal deps; keep dev deps (e.g., `pytest`) separated.
-- Create the package skeleton: `openwrt_imagegen/__init__.py` plus empty subpackages for imagebuilder, profiles, builds, flash.
+- Create the package skeleton: `openwrt_imagegen/__init__.py` plus empty subpackages for imagebuilder, profiles, builds, flash, and a shared `types.py`.
 - Add a minimal CLI: `python -m openwrt_imagegen --help` should work offline, return 0, and expose `--version`.
 - Add smoke tests under `tests/` (e.g., CLI `--help`); include `pytest` config.
 - Add tooling config in `pyproject.toml` for lint/format (ruff/black if adopted).

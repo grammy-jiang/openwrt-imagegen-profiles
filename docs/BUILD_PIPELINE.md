@@ -130,6 +130,9 @@ Store build outputs under a predictable tree that mirrors logical keys:
   - If the lock is held and a build succeeds, other waiters should treat the result as a cache hit and reuse artifacts.
 - Use separate locks for Image Builder downloads keyed by `(release, target, subtarget)` to avoid parallel downloads of the same archive.
 - Lock state should be stored in a filesystem lockfile under the cache roots or via DB row-level locking; keep it auditable and easy to clean up after crashes.
+- Concurrency limits:
+  - Configurable max concurrent builds; additional requests queue FIFO.
+  - Separate concurrency limit for downloads to avoid saturating network/disk.
 
 ## 1.4. Image Builder cache lifecycle and pruning
 
@@ -155,6 +158,7 @@ Batch requests (multiple profiles/devices) should be first-class:
 - Optionally allow “fail-fast” vs “best-effort” modes:
   - Fail-fast: stop remaining builds on first failure.
   - Best-effort: continue remaining builds, summarize failures at the end.
+- Scheduling: batch executor should honor global build/download concurrency limits and reuse cache-key locks to prevent duplicate work.
 
 ## 2. Inputs and cache key design
 
