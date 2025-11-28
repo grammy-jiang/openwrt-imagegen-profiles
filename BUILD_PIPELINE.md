@@ -8,8 +8,8 @@ This document explains how build orchestration works in this repo:
 - How different **frontends** (CLI, web, MCP) drive the same core pipeline.
 
 It is a design document only. The authoritative, always-up-to-date reference for the
-profile schema lives in `PROFILES.md`. The overall system architecture is in
-`ARCHITECTURE.md`. This file zooms in on the build pipeline itself.
+profile schema lives in [PROFILES.md](PROFILES.md). The overall system architecture is in
+[ARCHITECTURE.md](ARCHITECTURE.md). This file zooms in on the build pipeline itself.
 
 ## 1. High‑level pipeline
 
@@ -17,8 +17,8 @@ At a high level, building an image for a device profile follows this flow:
 
 1. **Resolve profile**
 
-   - Look up the profile definition in the database (or import from YAML/JSON and persist).
-   - Validate the profile against the schema in `PROFILES.md`.
+- Look up the profile definition in the database (or import from YAML/JSON and persist).
+- Validate the profile against the schema in [PROFILES.md](PROFILES.md).
 
 2. **Resolve Image Builder**
 
@@ -69,8 +69,8 @@ At a high level, building an image for a device profile follows this flow:
        ADD_LOCAL_KEY="<add_local_key>"
      ```
 
-   - All of these values are derived from the resolved profile + any per-request overrides.
-   - The exact mapping from profile fields to these variables is documented in `PROFILES.md`.
+- All of these values are derived from the resolved profile + any per-request overrides.
+- The exact mapping from profile fields to these variables is documented in [PROFILES.md](PROFILES.md).
 
 7. **Execute build**
 

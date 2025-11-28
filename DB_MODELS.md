@@ -7,11 +7,11 @@ database.
 
 It complements:
 
-- `ARCHITECTURE.md` – overall system responsibilities and data flow.
-- `PROFILES.md` – profile schema and examples.
-- `BUILD_PIPELINE.md` – build orchestration and caching.
-- `SAFETY.md` – TF/SD flashing and safety model.
-- `AI_CONTRIBUTING.md` – rules for AI changes, including "DB + ORM as source of truth".
+- [ARCHITECTURE.md](ARCHITECTURE.md) – overall system responsibilities and data flow.
+- [PROFILES.md](PROFILES.md) – profile schema and examples.
+- [BUILD_PIPELINE.md](BUILD_PIPELINE.md) – build orchestration and caching.
+- [SAFETY.md](SAFETY.md) – TF/SD flashing and safety model.
+- [AI_CONTRIBUTING.md](AI_CONTRIBUTING.md) – rules for AI changes, including "DB + ORM as source of truth".
 
 The goal is to keep the DB schema predictable, reproducible, and friendly to
 both human operators and AI tools.
@@ -38,8 +38,8 @@ both work), but the shapes and relationships are concrete.
 
 Conceptually, the main entities are:
 
-- **Profile** – immutable build recipe (see `PROFILES.md`).
-- **ImageBuilder** – a cached instance of the official OpenWrt Image Builder
+- **Profile** – immutable build recipe (see [PROFILES.md](PROFILES.md)).
+  -- **ImageBuilder** – a cached instance of the official OpenWrt Image Builder
   for a specific `(release, target, subtarget)`.
 - **BuildRecord** – one execution of the build pipeline for a particular
   combination of profile + Image Builder + options.

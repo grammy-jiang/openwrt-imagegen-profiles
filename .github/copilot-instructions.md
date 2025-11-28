@@ -13,7 +13,7 @@ This repo is currently mostly **design + profile data**; the core Python package
   - A Python orchestration layer that downloads/caches Image Builders, runs reproducible builds, tracks artifacts in a DB, and safely flashes TF/SD cards.
   - Multiple frontends (CLI, web UI, MCP server) over the same Python core.
 - Current contents:
-  - Top-level design docs: `README.md`, `ARCHITECTURE.md`, `BUILD_PIPELINE.md`, `DB_MODELS.md`, `FRONTENDS.md`, `SAFETY.md`, `PROFILES.md`, `AI_CONTRIBUTING.md`, `AI_WORKFLOW.md`.
+  - Top-level design docs: [README.md](../README.md), [ARCHITECTURE.md](../ARCHITECTURE.md), [BUILD_PIPELINE.md](../BUILD_PIPELINE.md), [DB_MODELS.md](../DB_MODELS.md), [FRONTENDS.md](../FRONTENDS.md), [SAFETY.md](../SAFETY.md), [PROFILES.md](../PROFILES.md), [AI_CONTRIBUTING.md](../AI_CONTRIBUTING.md), [AI_WORKFLOW.md](../AI_WORKFLOW.md).
   - Example profile YAMLs under `profiles/*.yaml` and overlay dirs under `profiles/overlays/`.
   - No `openwrt_imagegen/` package, no tests, and no CI workflows are present yet.
 - Languages / runtimes (intended): Python 3.10+ for orchestration; OpenWrt Image Builder (external tool) for firmware builds; optional web/MCP services layered on top.
@@ -124,9 +124,9 @@ Until CI exists, human reviewers will rely on:
 
 ## 6. How to use these instructions
 
-- Treat this file, `AI_CONTRIBUTING.md`, `AI_WORKFLOW.md`, and `ARCHITECTURE.md` as the **authoritative guidance** for AI work.
+- Treat this file, [AI_CONTRIBUTING.md](../AI_CONTRIBUTING.md), [AI_WORKFLOW.md](../AI_WORKFLOW.md), and [ARCHITECTURE.md](../ARCHITECTURE.md) as the **authoritative guidance** for AI work.
 - **Trust these instructions first**; only reach for grep, tree listing, or exploratory commands when:
-  - You need to inspect a specific doc (e.g. `PROFILES.md` for schema details), or
+  - You need to inspect a specific doc (e.g. [PROFILES.md](../PROFILES.md) for schema details), or
   - You suspect these instructions are out of date or incomplete.
 - When you discover that reality diverges from this file (for example, once a `pyproject.toml` or CI workflows are added), **update this file in the same PR** so future agents have accurate, low-friction guidance.
 

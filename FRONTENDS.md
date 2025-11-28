@@ -10,9 +10,9 @@ frontends for this project:
 All frontends are thin layers over the same Python orchestration core, which
 handles:
 
-- Profile management (see `PROFILES.md` and `DB_MODELS.md`).
-- Image Builder management and build orchestration (see `ARCHITECTURE.md` and `BUILD_PIPELINE.md`).
-- TF/SD flashing workflows and safety (see `SAFETY.md`).
+- Profile management (see [PROFILES.md](PROFILES.md) and [DB_MODELS.md](DB_MODELS.md)).
+- Image Builder management and build orchestration (see [ARCHITECTURE.md](ARCHITECTURE.md) and [BUILD_PIPELINE.md](BUILD_PIPELINE.md)).
+- TF/SD flashing workflows and safety (see [SAFETY.md](SAFETY.md)).
 
 This file focuses on how frontends should call into those core APIs and how they
 should present results.
@@ -35,12 +35,12 @@ Across all frontends:
 
    - Frontends should expose operations like "build-or-reuse" (default) and
      "force rebuild" in a way that maps directly to the semantics in
-     `BUILD_PIPELINE.md`.
+     [BUILD_PIPELINE.md](BUILD_PIPELINE.md).
 
 3. **Safety-first flashing**
 
    - Any action that writes to TF/SD cards uses the flashing APIs defined in
-     `openwrt_imagegen/flash/` and honors all rules from `SAFETY.md`.
+     `openwrt_imagegen/flash/` and honors all rules from [SAFETY.md](SAFETY.md).
 
 4. **Structured, machine-readable outputs**
 

@@ -1,6 +1,6 @@
 # Architecture Overview
 
-This repository defines an AI-friendly toolchain for building and managing custom OpenWrt firmware images across multiple devices. It combines:
+This repository defines an AI-friendly toolchain for building and managing custom OpenWrt firmware images across multiple devices. It combines (see also [README.md](README.md)):
 
 - **Declarative device profiles** – version-controlled descriptions of how each device’s image should be built.
 - **A Python orchestration core** – responsible for dynamically fetching and caching the official OpenWrt Image Builder, running reproducible builds, tracking artifacts, and coordinating flash workflows.
@@ -65,7 +65,7 @@ This responsibility ensures the correct official Image Builder is always availab
 
 ### 2. Profile management
 
-Profile management provides a single source of truth for how each device should be built, backed by a database and accessed through an ORM, with reasonable behavior when the database is not yet initialized.
+Profile management provides a single source of truth for how each device should be built, backed by a database and accessed through an ORM, with reasonable behavior when the database is not yet initialized (see [PROFILES.md](PROFILES.md) and [DB_MODELS.md](DB_MODELS.md)).
 
 - Each device is described by a **profile**, which acts as an immutable, declarative build recipe:
   - Device identifier (human-friendly ID).
@@ -253,3 +253,13 @@ The exact package names may evolve, but the architecture assumes a layout along 
 All OpenWrt- and build-related business logic should live under `openwrt_imagegen/`. Frontends (`cli.py`, `web/`, `mcp_server/`) should call these library functions rather than implementing their own build or flash flows.
 
 This structure is intended as guidance for future code rather than a strict requirement, but AI agents should default to these locations and separations when adding new functionality.
+
+---
+
+## TODO / coordination for AI onboarding
+
+- Keep `.github/copilot-instructions.md` in sync with this document whenever you:
+  - Add real code under `openwrt_imagegen/`.
+  - Introduce tests, CI workflows, or new frontends.
+  - Change how builds, profiles, or flashing are wired.
+- Treat `.github/copilot-instructions.md` as the **entrypoint** for AI agents; update it in the same PR as any architectural change so future agents don’t need to rediscover the workflow or run failing commands.

@@ -2,8 +2,8 @@
 
 This document consolidates the safety rules, verification steps, and operator guidance
 for TF/SD card flashing in this project. It complements the high-level design in
-`ARCHITECTURE.md`, the AI rules in `AI_CONTRIBUTING.md`, and the build-focused details in
-`BUILD_PIPELINE.md`.
+[ARCHITECTURE.md](ARCHITECTURE.md), the AI rules in [AI_CONTRIBUTING.md](AI_CONTRIBUTING.md), and the build-focused details in
+[BUILD_PIPELINE.md](BUILD_PIPELINE.md).
 
 Flashing is treated as a **separate, safety-critical workflow** layered on top of the
 build pipeline. The build pipeline produces and tracks images; the flashing layer writes
@@ -15,7 +15,7 @@ those images to explicit block devices with strong verification.
 
 The system splits responsibilities as follows:
 
-- **Build pipeline** (see `BUILD_PIPELINE.md`):
+- **Build pipeline** (see [BUILD_PIPELINE.md](BUILD_PIPELINE.md)):
 
   - Produces images from profiles using the official OpenWrt Image Builder.
   - Tracks artifacts, checksums, and build metadata in the database.

@@ -1,6 +1,6 @@
 # AI Contribution Instructions
 
-This document tells AI agents **how to work in this repository**: what is allowed, what is off-limits, and where to put new code. It summarizes and operationalizes the design in `ARCHITECTURE.md`.
+This document tells AI agents **how to work in this repository**: what is allowed, what is off-limits, and where to put new code. It summarizes and operationalizes the design in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 If you are an AI making changes here, follow this as a hard contract.
 
@@ -55,7 +55,7 @@ If a change conflicts with this intent, **don’t do it**.
    - No hidden global flags that change behavior unpredictably.
    - APIs should take clear, typed arguments.
 
-Before writing code or docs that affect behavior, cross‑check with `ARCHITECTURE.md`.
+Before writing code or docs that affect behavior, cross‑check with [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ---
 

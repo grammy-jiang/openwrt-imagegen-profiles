@@ -2,7 +2,7 @@
 
 This document describes how AI agents are expected to work in this repository,
 from proposing changes to updating docs and tests. It builds on the rules in
-`AI_CONTRIBUTING.md` and the architecture defined in `ARCHITECTURE.md`.
+[AI_CONTRIBUTING.md](AI_CONTRIBUTING.md) and the architecture defined in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 It is written for AI assistants (and humans supervising them) who are
 implementing or modifying functionality in an **AI-first** codebase.
@@ -33,15 +33,15 @@ AI agents should always:
 
 1. **Read the core docs** relevant to the change:
 
-   - `README.md` – project overview and goals.
-   - `ARCHITECTURE.md` – system design, responsibilities, and directory layout.
-   - `PROFILES.md` – profile schema and examples.
-   - `BUILD_PIPELINE.md` – how builds and caching work.
-   - `SAFETY.md` – TF/SD flashing safety.
-   - `DB_MODELS.md` – ORM model concepts.
-   - `FRONTENDS.md` – CLI/web/MCP responsibilities.
-   - `.github/copilot-instructions.md` – short AI-facing rules.
-   - `AI_CONTRIBUTING.md` – strict rules and expectations.
+- [README.md](README.md) – project overview and goals.
+- [ARCHITECTURE.md](ARCHITECTURE.md) – system design, responsibilities, and directory layout.
+- [PROFILES.md](PROFILES.md) – profile schema and examples.
+- [BUILD_PIPELINE.md](BUILD_PIPELINE.md) – how builds and caching work.
+- [SAFETY.md](SAFETY.md) – TF/SD flashing safety.
+- [DB_MODELS.md](DB_MODELS.md) – ORM model concepts.
+- [FRONTENDS.md](FRONTENDS.md) – CLI/web/MCP responsibilities.
+- [Copilot instructions](.github/copilot-instructions.md) – short AI-facing rules.
+- [AI_CONTRIBUTING.md](AI_CONTRIBUTING.md) – strict rules and expectations.
 
 2. **Understand the constraints**:
 
@@ -50,7 +50,8 @@ AI agents should always:
      builds, artifacts, and (optionally) flash records.
    - Profiles are immutable inputs to builds.
    - Frontends are thin; no business logic duplication.
-   - Flashing is safety-critical and must follow `SAFETY.md`.
+
+- Flashing is safety-critical and must follow [SAFETY.md](SAFETY.md).
 
 3. **Identify the right layer** to change:
 
@@ -195,10 +196,10 @@ Human reviewers can then:
 
 This workflow is intentionally aligned with:
 
-- `AI_CONTRIBUTING.md` – golden rules for AI changes.
-- `.github/copilot-instructions.md` – compact AI guidance.
-- `ARCHITECTURE.md`, `PROFILES.md`, `BUILD_PIPELINE.md`, `SAFETY.md`, and
-  `DB_MODELS.md` – authoritative design and data model references.
+- [AI_CONTRIBUTING.md](AI_CONTRIBUTING.md) – golden rules for AI changes.
+- [Copilot instructions](.github/copilot-instructions.md) – compact AI guidance.
+- [ARCHITECTURE.md](ARCHITECTURE.md), [PROFILES.md](PROFILES.md), [BUILD_PIPELINE.md](BUILD_PIPELINE.md), [SAFETY.md](SAFETY.md), and
+  [DB_MODELS.md](DB_MODELS.md) – authoritative design and data model references.
 
 AI agents should treat these documents as the contract for how to behave in this
 repository and keep them up to date as the implementation evolves.
