@@ -14,7 +14,9 @@ from __future__ import annotations
 import fcntl
 import logging
 import os
+import shutil
 import tempfile
+import time
 import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -113,8 +115,6 @@ def build_lock(
     lock_acquired = False
     try:
         if timeout is not None:
-            import time
-
             start = time.monotonic()
             while True:
                 try:
@@ -295,8 +295,6 @@ def build_or_reuse(
             )
         except OverlayStagingError:
             if staging_dir and staging_dir.exists():
-                import shutil
-
                 shutil.rmtree(staging_dir, ignore_errors=True)
             raise
 
@@ -424,8 +422,6 @@ def build_or_reuse(
     finally:
         # Clean up staging directory
         if staging_dir and staging_dir.exists():
-            import shutil
-
             shutil.rmtree(staging_dir, ignore_errors=True)
 
 

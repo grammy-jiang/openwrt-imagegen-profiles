@@ -12,6 +12,7 @@ See docs/BUILD_PIPELINE.md section 7 for design details.
 from __future__ import annotations
 
 import logging
+import os
 import shlex
 import subprocess
 from dataclasses import dataclass
@@ -223,8 +224,6 @@ def run_build(
             # Prepare environment
             env: dict[str, str] | None = None
             if env_override:
-                import os
-
                 env = dict(os.environ)
                 env.update(env_override)
 
