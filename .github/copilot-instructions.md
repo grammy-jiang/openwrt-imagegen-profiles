@@ -122,6 +122,15 @@ The Python package and tooling are now available. Use these commands:
      uv run python -m openwrt_imagegen --version
      uv run python -m openwrt_imagegen config --json
      ```
+   - Profile management commands:
+     ```bash
+     uv run python -m openwrt_imagegen profiles --help
+     uv run python -m openwrt_imagegen profiles validate profiles/home-ap-livingroom.yaml
+     uv run python -m openwrt_imagegen profiles import profiles/
+     uv run python -m openwrt_imagegen profiles list
+     uv run python -m openwrt_imagegen profiles show <profile-id>
+     uv run python -m openwrt_imagegen profiles export /tmp/exports
+     ```
 
 6. Tox (optional, if introduced)
    - Mirror CI by running:

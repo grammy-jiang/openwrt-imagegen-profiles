@@ -34,8 +34,12 @@ This repository provides an opinionated Python library for managing OpenWrt Imag
    - Added Alembic with initial migration (`alembic/versions/`).
    - Added comprehensive CRUD tests in `tests/test_models.py`.
 
-4. **Profile validation + import/export**  
-   - Implement `profiles/schema.py` (Pydantic), `profiles/io.py`, `profiles/service.py` for CRUD/query/import/export; tests for validation and bulk import/export reporting.
+4. **Profile validation + import/export** ✅ (completed)
+   - Implemented `profiles/schema.py` with Pydantic models for profile validation.
+   - Implemented `profiles/io.py` for YAML/JSON import/export.
+   - Implemented `profiles/service.py` for CRUD/query/import/export operations.
+   - Added CLI commands: `profiles list`, `profiles show`, `profiles import`, `profiles export`, `profiles validate`.
+   - Added comprehensive tests in `tests/test_profiles_schema.py`, `tests/test_profiles_io.py`, `tests/test_profiles_service.py`.
 
 5. **Image Builder management**  
    - Implement URL discovery, download with checksum/signature verification, extraction, and metadata updates; locking for downloads.  
@@ -79,6 +83,7 @@ Group dependencies in `pyproject.toml` via uv/PEP 621 optional dependency groups
   - HTTP client: `httpx`.
   - CLI + progress: `typer[all]` with `rich` for output/progress.
   - Retry/backoff: `tenacity`.
+  - YAML parsing: `pyyaml>=6`.
 
 - **Web + MCP (shared ASGI stack)**
   - Framework/server: `fastapi` (on Starlette) with `uvicorn[standard]`.
@@ -143,6 +148,14 @@ Keep the default install minimal (core runtime only). Use extras like `[dev]`, `
 - CLI smoke:
   ```
   uv run python -m openwrt_imagegen --help
+  ```
+- Profile commands:
+  ```
+  uv run python -m openwrt_imagegen profiles --help
+  uv run python -m openwrt_imagegen profiles validate profiles/home-ap-livingroom.yaml
+  uv run python -m openwrt_imagegen profiles import profiles/
+  uv run python -m openwrt_imagegen profiles list
+  uv run python -m openwrt_imagegen profiles show <profile-id>
   ```
 - Update lockfile:
   ```
