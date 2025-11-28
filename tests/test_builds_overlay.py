@@ -329,6 +329,83 @@ class TestStageOverlay:
 
         assert "source_not_found" in exc_info.value.code
 
+    def test_source_path_traversal_blocked(self, tmp_path, minimal_profile):
+        """Should block source paths that escape base_path."""
+        # Create a file outside base_path
+        external_dir = tmp_path / "external"
+        external_dir.mkdir()
+        (external_dir / "secret.txt").write_text("secret data")
+
+        base_path = tmp_path / "base"
+        base_path.mkdir()
+
+        # Try to access file outside base_path via path traversal
+        profile = ProfileSchema(
+            **{
+                **minimal_profile.model_dump(),
+                "files": [
+                    FileSpecSchema(
+                        source="../external/secret.txt",
+                        destination="/etc/secret.txt",
+                    )
+                ],
+            }
+        )
+
+        staging_dir = tmp_path / "staging"
+        with pytest.raises(OverlayStagingError) as exc_info:
+            stage_overlay(staging_dir, profile, base_path)
+
+        assert "path_traversal" in exc_info.value.code
+
+    def test_overlay_dir_path_traversal_blocked(self, tmp_path, minimal_profile):
+        """Should block overlay_dir that escapes base_path."""
+        # Create external overlay
+        external_dir = tmp_path / "external_overlay"
+        external_dir.mkdir()
+        (external_dir / "secret.txt").write_text("secret")
+
+        base_path = tmp_path / "base"
+        base_path.mkdir()
+
+        profile = ProfileSchema(
+            **{
+                **minimal_profile.model_dump(),
+                "overlay_dir": "../external_overlay",
+            }
+        )
+
+        staging_dir = tmp_path / "staging"
+        with pytest.raises(OverlayStagingError) as exc_info:
+            stage_overlay(staging_dir, profile, base_path)
+
+        assert "path_traversal" in exc_info.value.code
+
+    def test_destination_path_traversal_blocked(self, tmp_path, minimal_profile):
+        """Should block destination paths that escape staging_dir."""
+        base_path = tmp_path / "base"
+        (base_path / "files").mkdir(parents=True)
+        (base_path / "files" / "test.txt").write_text("test")
+
+        # Try to write outside staging_dir via path traversal in destination
+        profile = ProfileSchema(
+            **{
+                **minimal_profile.model_dump(),
+                "files": [
+                    FileSpecSchema(
+                        source="files/test.txt",
+                        destination="/../../escaped.txt",
+                    )
+                ],
+            }
+        )
+
+        staging_dir = tmp_path / "staging"
+        with pytest.raises(OverlayStagingError) as exc_info:
+            stage_overlay(staging_dir, profile, base_path)
+
+        assert "path_traversal" in exc_info.value.code
+
 
 class TestComputeTreeHash:
     """Tests for compute_tree_hash function."""

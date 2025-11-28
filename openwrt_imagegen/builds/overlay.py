@@ -141,6 +141,34 @@ def stage_directory(
         ) from e
 
 
+def _validate_path_within_base(path: Path, base: Path, path_type: str) -> Path:
+    """Validate that a path is contained within a base directory.
+
+    Args:
+        path: Path to validate (will be resolved).
+        base: Base directory (will be resolved).
+        path_type: Description of the path for error messages.
+
+    Returns:
+        The resolved path.
+
+    Raises:
+        OverlayStagingError: If path escapes base directory.
+    """
+    resolved_path = path.resolve()
+    resolved_base = base.resolve()
+
+    try:
+        resolved_path.relative_to(resolved_base)
+    except ValueError:
+        raise OverlayStagingError(
+            f"{path_type} path traversal detected: {path} resolves outside {base}",
+            code="path_traversal",
+        ) from None
+
+    return resolved_path
+
+
 def stage_overlay(
     staging_dir: Path,
     profile: ProfileSchema,
@@ -158,16 +186,24 @@ def stage_overlay(
         Path to the staged directory (staging_dir).
 
     Raises:
-        OverlayStagingError: If staging fails.
+        OverlayStagingError: If staging fails or path traversal detected.
     """
     if base_path is None:
         base_path = Path.cwd()
 
+    # Resolve base_path to absolute for security checks
+    base_path_resolved = base_path.resolve()
+
     staging_dir.mkdir(parents=True, exist_ok=True)
+    staging_dir_resolved = staging_dir.resolve()
 
     # Stage overlay_dir first (files can override)
     if profile.overlay_dir:
         overlay_path = base_path / profile.overlay_dir
+
+        # Security: validate overlay_dir doesn't escape base_path
+        _validate_path_within_base(overlay_path, base_path_resolved, "overlay_dir")
+
         if not overlay_path.exists():
             raise OverlayStagingError(
                 f"Overlay directory not found: {overlay_path}",
@@ -186,6 +222,10 @@ def stage_overlay(
     if profile.files:
         for file_spec in profile.files:
             source_path = base_path / file_spec.source
+
+            # Security: validate source doesn't escape base_path
+            _validate_path_within_base(source_path, base_path_resolved, "source")
+
             if not source_path.exists():
                 raise OverlayStagingError(
                     f"Source file not found: {source_path}",
@@ -195,6 +235,9 @@ def stage_overlay(
             # Destination is absolute path in image, convert to relative
             dest_rel = file_spec.destination.lstrip("/")
             dest_path = staging_dir / dest_rel
+
+            # Security: validate destination doesn't escape staging_dir
+            _validate_path_within_base(dest_path, staging_dir_resolved, "destination")
 
             mode = parse_mode(file_spec.mode)
             logger.debug(
