@@ -533,6 +533,21 @@ Key rules the validation layer should enforce:
 
 ---
 
+## 7. Profile collections and batch workflows
+
+Building for multiple devices at once is a core use case. The system should support:
+
+- **Tags and filters**: use `tags`, `openwrt_release`, `target`, and `subtarget` to select sets of profiles (e.g., “all `23.05` APs”).
+- **Profile groups/queries**: allow batch build requests that reference a filter rather than enumerating profile IDs; record the resolved profile list in the BuildRecord input snapshot.
+- **Bulk import/export**: support importing/exporting multiple profiles (directory or glob) with validation per file and a report of successes/failures.
+- **Version pinning**: ensure batch builds pin each profile to its declared release/target/subtarget; refuse mixed-release batches unless explicitly allowed.
+- **Result aggregation**: batch build responses should include per-profile build IDs, cache-hit status, and artifact manifests so downstream flashing can target the right device.
+- **Failure handling**: surface partial failures clearly; successful builds in a batch remain usable even if others fail.
+
+Frontends (CLI/web/MCP) must expose batch selection by tag/filter and provide JSON output capturing all per-profile results.
+
+---
+
 ## 7. How profiles interact with builds
 
 When calling the build library (e.g. `build_or_reuse(profile_id, options)`):

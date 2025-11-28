@@ -106,6 +106,56 @@ At a high level, building an image for a device profile follows this flow:
 This pipeline is designed to be deterministic, idempotent, and cache-aware: the same
 inputs should always produce either a cache hit or an identical new build.
 
+## 1.1. Overlay resolution and hashing
+
+`FILES` content is part of the build input and must be hashed deterministically:
+
+- Materialize per-build overlay dir by copying profile `files` entries and `overlay_dir` contents into a temp staging directory; resolve symlinks by copying content (do not follow symlinks outside the repo/root).
+- Normalize permissions/ownership according to profile spec before hashing.
+- Compute a tree hash (e.g., SHA-256 over sorted file paths + contents + modes) for the staging directory; include that hash in the cache key and persist it on the BuildRecord input snapshot.
+- Pass the staged directory to Image Builder via `FILES=<staging path>`, not the source overlay paths, to avoid non-deterministic upstream walking.
+
+## 1.2. Artifact layout and naming
+
+Store build outputs under a predictable tree that mirrors logical keys:
+
+- Default layout: `artifacts/<release>/<target>/<subtarget>/<profile_id>/<build_id>/...`
+- Include both upstream-generated filenames and a manifest (JSON) containing: artifact kind (sysupgrade/factory/manifest/other), size, sha256, source build ID, cache key, and timestamps.
+- Surface artifact paths and checksums in BuildRecord and Artifact rows; flashing code should consume these rather than re-hashing the on-disk files.
+
+## 1.3. Concurrency and locking
+
+- When resolving a build request:
+  - Acquire a lightweight, cache-key–scoped lock before starting a build to avoid duplicate work when two callers request the same inputs concurrently.
+  - If the lock is held and a build succeeds, other waiters should treat the result as a cache hit and reuse artifacts.
+- Use separate locks for Image Builder downloads keyed by `(release, target, subtarget)` to avoid parallel downloads of the same archive.
+- Lock state should be stored in a filesystem lockfile under the cache roots or via DB row-level locking; keep it auditable and easy to clean up after crashes.
+
+## 1.4. Image Builder cache lifecycle and pruning
+
+- Cache key for builders: `(release, target, subtarget)`.
+- Metadata to persist: upstream URL, archive checksum, signature status, local root, state (`pending`, `ready`, `broken`, `deprecated`), first/last used timestamps, and size on disk.
+- Pruning policy:
+  - Safe prune: remove builders marked `deprecated` and not referenced by any successful build in the DB.
+  - Aggressive prune (opt-in): remove least-recently-used builders when cache exceeds a configured size limit; refuse to prune builders referenced by successful builds unless explicitly forced.
+- Downloads must verify checksum/signature before marking `ready`. Failed verification marks `broken` and surfaces a `DownloadError`.
+
+## 1.5. Batch builds and scheduling
+
+Batch requests (multiple profiles/devices) should be first-class:
+
+- Accept a list of profile IDs or a filter (e.g., by tag/release/target). Resolve the filter to an explicit list and persist that list in the batch request record.
+- For each profile, compute cache key independently; reuse cached builds where available and only run Image Builder when needed.
+- Concurrency:
+  - Limit concurrent Image Builder invocations to a configurable number to avoid resource contention; queue excess requests FIFO.
+  - Per-builder locks (Section 1.3) still apply; batch execution should interleave safely with single builds.
+- Batch result aggregation:
+  - Return per-profile build IDs, statuses, cache-hit flags, artifacts, and log paths.
+  - Batch status should reflect partial failures; successful builds remain usable.
+- Optionally allow “fail-fast” vs “best-effort” modes:
+  - Fail-fast: stop remaining builds on first failure.
+  - Best-effort: continue remaining builds, summarize failures at the end.
+
 ## 2. Inputs and cache key design
 
 ### 2.1. What goes into a build input

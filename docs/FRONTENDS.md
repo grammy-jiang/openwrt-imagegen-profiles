@@ -53,6 +53,18 @@ Across all frontends:
      - Mapped from structured core exceptions to frontend-specific formats.
      - Descriptive enough for both humans and AI agents.
 
+6. **Streaming and observability**
+
+   - Prefer simple polling endpoints first (e.g., `GET /builds/{id}`, `GET /builds/{id}/log`) that return the same data shapes used by CLI/MCP.
+   - Add SSE/WebSocket streaming only when justified; reuse the same payloads and error codes.
+   - Surface cache-hit vs new-build, artifact metadata, and log paths consistently.
+
+6. **Streaming and observability**
+
+   - Prefer simple polling endpoints first (e.g., `GET /builds/{id}`, `GET /builds/{id}/log`) that return the same data shapes used by CLI/MCP.
+   - Add SSE/WebSocket streaming only when justified; reuse the same payloads and error codes.
+   - Surface cache-hit vs new-build, artifact metadata, and log paths consistently.
+
 ---
 
 ## 2. CLI frontend
@@ -99,6 +111,9 @@ Examples of how CLI commands might map to core APIs (names are illustrative):
 - Flashing:
   - `imagegen flash --artifact-id 456 --device /dev/sdX --dry-run`
   - `imagegen flash --artifact-id 456 --device /dev/sdX --force`
+- Batch builds:
+  - `imagegen build --tag 23.05 --target ath79 --subtarget generic`
+  - `imagegen build --profiles home.ap-livingroom.23.05 home.ap-bedroom.23.05`
 
 ### 2.3. Implementation notes
 
@@ -115,6 +130,12 @@ Examples of how CLI commands might map to core APIs (names are illustrative):
   - Provide a `--json` flag or similar that returns structured responses
     consistent with MCP and web API schemas.
 
+### 2.4. Behavior and outputs
+
+- Exit codes map to error classes (see `OPERATIONS.md`) so CI can distinguish validation errors vs build failures vs flash failures.
+- `--json` output should include stable keys: `status`, `cache_hit`, `artifacts`, `log_path`, and `error` (`code`, `message`, `details`).
+- Long-running operations (build/flash/batch) should print periodic status or instruct users to poll a `build_id` / batch ID / `flash_id` rather than blocking silently.
+
 ---
 
 ## 3. Web frontend
@@ -130,6 +151,13 @@ The web UI should allow users to:
 - Trigger builds and display their status and logs.
 - List artifacts and download images.
 - Trigger flashing workflows on controlled machines.
+- Run batch builds filtered by tag/release/target and present per-profile results.
+
+### 3.1.1. Web UX / API guidance
+
+- Keep HTTP routes thin proxies to core APIs; prefer JSON-backed forms even for rendered pages so MCP/CLI can mirror the same payloads.
+- Use POST to start long-running actions, then poll `GET /builds/{id}` / `GET /flash/{id}` for status and logs; add SSE/WebSocket only if needed later.
+- Do not auto-select devices for flashing; require explicit input and confirmation flags mirroring CLI semantics (`--dry-run`, `--force`).
 
 ### 3.2. API design
 
@@ -140,11 +168,13 @@ The web UI should allow users to:
     - `POST /builds` to request a build-or-reuse.
     - `GET /builds/{id}` for status and metadata.
     - `GET /builds/{id}/artifacts`.
+    - `POST /builds/batch` to request builds by filter or explicit profile list.
     - `POST /flash` to request a flash operation.
   - Return JSON responses that include:
     - IDs, statuses, timestamps.
     - Profile, ImageBuilder, and BuildRecord references.
     - Artifact metadata (paths, sizes, hashes).
+    - For batch builds: per-profile results (build_id, status, cache_hit, artifacts, log_path) plus overall batch status.
 
 - The web UI should call these APIs instead of embedding business logic in
   templates or view functions.
@@ -155,6 +185,12 @@ The web UI should allow users to:
   - Web endpoints that can flash devices must be protected and likely limited to
     trusted environments.
   - The same flashing safety rules from `SAFETY.md` apply regardless of auth.
+
+### 3.4. Web UX / API guidance
+
+- Keep HTTP routes thin proxies to core APIs; prefer JSON-backed forms even for rendered pages so MCP/CLI can mirror the same payloads.
+- Use POST to start long-running actions, then poll `GET /builds/{id}` / `GET /flash/{id}` / `GET /builds/batch/{id}` for status and logs; add SSE/WebSocket only if needed later.
+- Do not auto-select devices for flashing; require explicit input and confirmation flags mirroring CLI semantics (`--dry-run`, `--force`).
 
 ---
 
@@ -170,9 +206,17 @@ Model Context Protocol.
   - `list_profiles`
   - `get_profile`
   - `build_image`
+  - `build_images_batch`
   - `list_builds`
   - `list_artifacts`
   - `flash_artifact`
+
+### 4.1.1. MCP behavior details
+
+- Tools must be idempotent where applicable: `build_image` returns cache hits transparently unless `force_rebuild` is set; `flash_artifact` refuses to guess devices.
+- Batch tool (`build_images_batch`) should accept filters or explicit profile lists, return per-profile build IDs/statuses/cache-hit flags, and support fail-fast vs best-effort modes (see `BUILD_PIPELINE.md`).
+- Errors include a stable `code`, `message`, and `log_path` when available (see `OPERATIONS.md`).
+- Streaming build/flash status can be handled by polling; if streaming is added, reuse the same payload shapes as `list_*`/`get_*`.
 
 - Provide structured, machine-friendly results that include:
   - Stable IDs (profile IDs, build IDs, artifact IDs).
@@ -190,6 +234,7 @@ Model Context Protocol.
 - Example mappings:
 
   - `build_image` MCP tool → `openwrt_imagegen.builds.build_or_reuse(...)`.
+  - `build_images_batch` MCP tool → `openwrt_imagegen.builds.build_batch(...)`.
   - `flash_artifact` MCP tool → `openwrt_imagegen.flash.flash_artifact(...)`.
 
 - Error handling:

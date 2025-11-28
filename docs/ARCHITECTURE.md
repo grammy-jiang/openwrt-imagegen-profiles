@@ -38,6 +38,117 @@ The goal is to make it easy for both humans and AI agents to request reproducibl
 
 ---
 
+## Core package design (planned)
+
+`openwrt_imagegen/` is the single Python package. Subpackages and their responsibilities:
+
+- `openwrt_imagegen/imagebuilder/`
+  - Discover official Image Builder URLs for `(release, target, subtarget)`.
+  - Download/verify archives, extract to cache roots, record metadata, and manage cache pruning (see [BUILD_PIPELINE.md](BUILD_PIPELINE.md)).
+  - Expose “ensure builder present” and cache state/query APIs.
+
+- `openwrt_imagegen/profiles/`
+  - ORM models for profiles; validation and import/export (YAML/JSON/TOML).
+  - Query APIs (by `profile_id`, tag, release, target/subtarget).
+  - Profile CRUD (when enabled) with history/version-awareness where applicable.
+
+- `openwrt_imagegen/builds/`
+  - Build orchestration: cache-key computation, overlay staging, calling Image Builder, artifact discovery, manifest generation.
+  - BuildRecord and Artifact ORM models; cache lookup and cache-hit handling.
+  - Batch build orchestration (multi-profile) with per-profile results.
+  - Concurrency controls and locking for builders and cache keys.
+
+- `openwrt_imagegen/flash/`
+  - Flash workflows adhering to [SAFETY.md](SAFETY.md): device validation, optional wipe, write, hash verification, logging.
+  - Optional FlashRecord model for audit trails.
+
+- `openwrt_imagegen/config.py`
+  - Config/env parsing (pydantic), defaults for paths (cache/artifacts/DB/tmp), and feature toggles (offline mode, concurrency limits).
+
+- `openwrt_imagegen/__main__.py` or `cli.py`
+  - Thin CLI that delegates to the above modules; argument parsing only.
+
+- `web/` (planned)
+  - FastAPI app exposing HTTP endpoints that proxy to `openwrt_imagegen` APIs.
+
+- `mcp_server/` (planned)
+  - Starlette/FastAPI-based MCP server implementing tools described in [FRONTENDS.md](FRONTENDS.md).
+
+All shared types (e.g., dataclasses for request/response payloads) should live in a small `openwrt_imagegen/types.py` or equivalent to avoid cycles.
+
+---
+
+## Execution contexts and flows
+
+- **CLI**: synchronous calls into core modules; supports JSON output for automation; long-running operations should emit status and return build/flash IDs for polling.
+- **Web**: HTTP endpoints that start builds/flash operations and return IDs; clients poll for status/logs; optional SSE/WebSocket can reuse the same payloads.
+- **MCP**: idempotent tool calls mapping to core APIs; must surface cache hits, errors with codes, and log paths; batch builds supported.
+- **Automation/CI**: invoke CLI or MCP with JSON outputs; rely on stable exit codes defined in [OPERATIONS.md](OPERATIONS.md).
+
+Data flow (build request):
+1. Resolve profile(s) (DB + validation).
+2. Ensure Image Builder present (download/verify/cache).
+3. Compute cache key (profile snapshot + overlays hash + options).
+4. Lock on cache key; check for existing successful build.
+5. Stage overlays (`FILES`), compose `make image` command, run.
+6. Discover artifacts, compute hashes, write manifest, persist records.
+7. Return structured result (status, cache_hit, artifacts, log path).
+
+Data flow (flash request):
+1. Resolve artifact (by ID or path) and checksum.
+2. Validate device path (whole-device only).
+3. Optional wipe; write with fsync; verify hash (full or prefix).
+4. Log and persist flash record (if model exists); return status and log path.
+
+---
+
+## State and storage
+
+- **Database**: ORM-backed tables for profiles, ImageBuilders, BuildRecords, Artifacts, and optional FlashRecords (see [DB_MODELS.md](DB_MODELS.md)). SQLite by default; Postgres supported via `psycopg` when configured.
+- **Filesystem**:
+  - Image Builder cache: `~/.cache/openwrt-imagegen/builders/<release>/<target>/<subtarget>/`
+  - Build working dirs: `<cache_root>/<release>/<target>/<subtarget>/builds/<profile>/<build_id>/`
+  - Artifacts: `~/.local/share/openwrt-imagegen/artifacts/<release>/<target>/<subtarget>/<profile_id>/<build_id>/`
+  - Logs: user-owned log dir with rotation (documented in [OPERATIONS.md](OPERATIONS.md)).
+  - Overlays staging: temp dir per build; staged tree hashed and referenced via `FILES=`.
+
+---
+
+## Configuration and precedence
+
+- Sources: CLI flags > environment variables > config file (if added) > defaults (see [DEVELOPMENT.md](DEVELOPMENT.md)).
+- Key knobs: cache/artifacts/db paths, offline mode, concurrency limits (builders/builds), timeout limits for downloads/builds/flashes, verification mode (full vs prefix), fail-fast vs best-effort for batch builds.
+- Config parsing via pydantic; expose effective config in JSON for observability.
+
+---
+
+## Concurrency, locking, and queues
+
+- Per-builder locks for downloads `(release, target, subtarget)`.
+- Per-cache-key locks for builds; waiters consume the finished build as cache hits.
+- Configurable concurrency limits for build execution to avoid resource contention; queue additional requests FIFO.
+- Batch builds should respect the same locks/limits while iterating over profiles.
+
+---
+
+## Observability and error semantics
+
+- Logging: stdlib `logging` with structured context (profile_id, build_id, imagebuilder release/target/subtarget, cache_key, artifact_id, device).
+- Errors: typed exceptions with stable codes (see [OPERATIONS.md](OPERATIONS.md)); surface in CLI/web/MCP outputs with `code`, `message`, `log_path`.
+- Manifests: each build writes a manifest (JSON) containing inputs, artifacts, hashes, and cache key to aid debugging and reuse.
+- Metrics (optional): add hooks for counters/timers (downloads, cache hits/misses, build duration, flash verification failures) if/when a metrics backend is chosen.
+
+---
+
+## Extensibility guidelines
+
+- Add new profile fields only with matching validation and DB schema updates; document in [PROFILES.md](PROFILES.md) and [DB_MODELS.md](DB_MODELS.md).
+- New CLI/web/MCP features must call into core modules; do not reimplement build/flash logic.
+- Keep batch operations and idempotency in mind for new APIs; prefer deterministic inputs and cache-aware behavior.
+- Maintain backward-compatible JSON shapes for CLI/MCP/web; add fields compatibly and deprecate before removal.
+
+---
+
 ## Core Responsibilities
 
 The system focuses on four main responsibilities. Each responsibility is implemented in a way that is:
