@@ -918,3 +918,147 @@ uv run uvicorn web:app --reload --host 0.0.0.0 --port 8000
 
 The GUI remains a minimal, safe, and dependency-light frontend, fully backed by
 the existing `openwrt_imagegen` core services and FastAPI web API.
+
+---
+
+## 13. Notes for AI agents (Copilot, etc.)
+
+This section is specifically for AI coding agents that will implement or
+maintain the GUI. Humans can ignore or skim it.
+
+### 13.1. High-level rules
+
+- Treat this document as the **source of truth** for GUI behavior.
+- Never duplicate business logic that already exists in
+  `openwrt_imagegen.*.service` modules.
+- GUI routes under `/ui` should:
+  - Call core services directly using shared dependencies from `web.deps`.
+  - Respect all safety constraints in `SAFETY.md` and `OPERATIONS.md`,
+    especially for flashing.
+  - Avoid new global state or alternative database engines/sessions.
+
+When in doubt about a behavior, prefer:
+
+1. Reading the relevant service module and tests under `tests/`.
+2. Wiring a _thin_ adapter in `web/routers/gui.py` that calls the service.
+3. Returning to this design doc and `FRONTENDS.md` for consistency.
+
+### 13.2. Where to put code
+
+- New HTML endpoints: `web/routers/gui.py`.
+- Templates: `web/templates/...` as listed in section 2.1.
+- Static files: `web/static/css/style.css`, `web/static/js/app.js`.
+- Tests: `tests/test_web_gui.py` (reusing fixtures from
+  `tests/test_web_api.py`).
+
+Do **not** add GUI-specific logic under `openwrt_imagegen/`; that layer must
+remain backend-agnostic and reusable.
+
+### 13.3. How to call services
+
+For each `/ui` route, prefer the following pattern:
+
+```python
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.templating import Jinja2Templates
+
+from web.deps import get_db_session, get_settings
+from openwrt_imagegen.profiles import service as profiles_service
+from openwrt_imagegen.builds import service as builds_service
+from openwrt_imagegen.flash import service as flash_service
+
+router = APIRouter()
+templates = Jinja2Templates(directory="web/templates")
+
+
+@router.get("/profiles", response_class=HTMLResponse)
+def ui_profiles_list(
+    request: Request,
+    db = Depends(get_db_session),
+    q: str | None = None,
+):
+    profiles = profiles_service.list_profiles(db=db, q=q)
+    return templates.TemplateResponse(
+        "profiles/list.html",
+        {"request": request, "profiles": profiles, "filters": {"q": q}},
+    )
+```
+
+- Use FastAPI dependency injection (`Depends`) for DB session and settings.
+- Do **not** use `requests`/HTTP to call JSON endpoints; call the services
+  directly.
+
+Section 6 already maps each `/ui` route to its corresponding service
+functions; follow that mapping exactly unless this document is explicitly
+updated.
+
+### 13.4. Safety expectations for flashing
+
+When implementing `/ui/flash/new` and `POST /ui/flash`:
+
+- Do not auto-detect devices or guess `/dev/*` paths.
+- Enforce the confirmation rule from section 4.4.3:
+  - `confirmation.strip() == device.strip()` must hold, otherwise return a
+    400 error and re-render the wizard.
+- Make `dry_run` the **default** and clearly indicate in the template when a
+  real write is requested.
+- Only allow real writes when **all** of the following hold:
+  - `dry_run is False`;
+  - `force is True` (checkbox explicitly checked);
+  - confirmation matches the device path.
+
+If in doubt, re-read `docs/SAFETY.md` and mirror the checks that already
+exist in the flash service and tests.
+
+### 13.5. Testing requirements
+
+Before considering the GUI implementation complete, make sure at least the
+following pass:
+
+1. Lint and type-check:
+
+   ```bash
+   uv run ruff check
+   uv run mypy openwrt_imagegen
+   ```
+
+2. Tests (at minimum):
+
+   ```bash
+   uv run pytest tests/test_web_api.py tests/test_web_gui.py tests/test_flash_*.py
+   ```
+
+3. Manual smoke test (optional but recommended):
+
+   ```bash
+   uv run uvicorn web:app --reload --host 0.0.0.0 --port 8000
+   ```
+
+   Then visit `/ui/` and walk through:
+
+   - dashboard → profiles → profile detail,
+   - profile detail → build → build detail,
+   - build detail → flash wizard → flash detail (dry-run only in dev).
+
+### 13.6. Minimal prompt for Copilot Agent
+
+When running a GitHub Copilot Agent on this repo to implement the GUI, use a
+prompt along these lines (adapted as needed):
+
+> You are working in the `openwrt-imagegen-profiles` repo.
+> Read and strictly follow `docs/WEB_GUI_FRONTEND_DESIGN.md`,
+> `docs/WEB_GUI_PLAN.md`, `docs/FRONTENDS.md`, and `docs/SAFETY.md`.
+> Implement the `/ui` web GUI as described there, using FastAPI + Jinja2
+> without SPA frameworks.
+> Add `web/routers/gui.py`, templates under `web/templates/`, static assets
+> under `web/static/`, and tests in `tests/test_web_gui.py`.
+> GUI routes must call the existing `openwrt_imagegen` service modules via
+> `web.deps` dependencies, not via HTTP to JSON endpoints.
+> Prioritize safety for all flashing operations and ensure dry-run-by-default
+> behavior.
+> Make small, incremental changes, run `ruff`, `mypy`, and `pytest` as
+> described in the docs, and keep public JSON/CLI APIs unchanged.
+
+Agents should treat this section as normative unless the repository owners
+update it.

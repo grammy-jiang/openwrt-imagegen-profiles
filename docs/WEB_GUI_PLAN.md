@@ -353,3 +353,38 @@ uv run uvicorn web:app --reload --host 0.0.0.0 --port 8000
 - `http://localhost:8000/ui/flash` – flash history
 
 All core behavior continues to be driven by the `openwrt_imagegen` library, with the GUI acting as a minimal, human-friendly layer over the existing web API.
+
+---
+
+## 8. Notes for AI agents
+
+This plan is intended to be implemented both by humans and by AI coding
+agents (e.g., GitHub Copilot Agent). For agents working in this repo:
+
+- Treat `docs/WEB_GUI_FRONTEND_DESIGN.md` as the **detailed spec** for
+  routes, templates, data flow, and safety rules.
+- Do not introduce new business logic into `web/` or `docs/`; instead, call
+  existing services in `openwrt_imagegen.*.service` modules via `web.deps`
+  dependencies.
+- Prefer small, incremental changes:
+  - Implement Phase 1–4 in order (section 6 of this document).
+  - After each phase, run linting and targeted tests.
+
+A minimal task prompt for agents could be:
+
+> Read `docs/WEB_GUI_PLAN.md`, `docs/WEB_GUI_FRONTEND_DESIGN.md`,
+> `docs/FRONTENDS.md`, and `docs/SAFETY.md`.
+> Implement the `/ui` FastAPI + Jinja2 GUI as described there, without SPA
+> frameworks.
+> Add `web/routers/gui.py`, templates under `web/templates/`, static files
+> under `web/static/`, and tests in `tests/test_web_gui.py`.
+> Use `web.deps` to obtain DB sessions and settings, and call the
+> `openwrt_imagegen` service modules directly rather than HTTP-calling the
+> JSON endpoints.
+> Respect all flashing safety requirements (dry-run by default, force flag,
+> explicit device confirmation).
+> Keep JSON/CLI/MCP public APIs unchanged and ensure `ruff`, `mypy`, and
+> `pytest` all pass.
+
+For more detailed agent guidance, see section 13 of
+`docs/WEB_GUI_FRONTEND_DESIGN.md`.
