@@ -289,13 +289,9 @@ def flash_image(
         build_id: Build ID if flashing from database.
 
     Returns:
-        FlashResult with operation details.
-
-    Raises:
-        ImageNotFoundError: Image file not found.
-        DeviceValidationError: Device validation failed.
-        WriteError: Write operation failed.
-        HashMismatchError: Hash verification failed.
+        FlashResult with operation details. If an error occurs (e.g., device validation failure,
+        image not found, write error, hash mismatch), the returned FlashResult will have
+        success=False and error details populated. Exceptions are not propagated.
     """
     if settings is None:
         settings = get_settings()
