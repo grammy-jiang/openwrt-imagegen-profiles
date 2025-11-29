@@ -255,7 +255,7 @@ YAML is the primary human-editable export/import format. A profile YAML file cor
 
 ### 3.1 Minimal example (simple AP)
 
-The file `profiles/home-ap-livingroom.yaml` in this repository is a concrete instance of this minimal profile:
+The file `profiles/home-ap-livingroom.yaml` in this repository is a concrete instance of this minimal profile (validated by `profiles/schema.py` and imported via `profiles/service.py`):
 
 ```yaml
 profile_id: home.ap-livingroom.23.05

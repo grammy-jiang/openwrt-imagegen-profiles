@@ -19,8 +19,8 @@ Under the hood, everything is driven by a shared Python library that:
 Frontends are thin adapters over that library:
 
 - A **CLI** for local use and CI.
-- A **web interface** for interactive control (planned).
-- An **MCP server** so AI tools can request builds, list artifacts, and trigger flashes programmatically (planned).
+- A **FastAPI web API** for HTTP access to profiles, builders, builds, and flash operations.
+- An **MCP server** so AI tools can request builds, list artifacts, and trigger flashes programmatically.
 
 This project does **not** replace the OpenWrt SDK or Image Builder; it wraps the official tools with higher-level workflows, safety checks, and persistent metadata.
 
@@ -35,9 +35,9 @@ source .venv/bin/activate
 uv pip install -e .[dev]
 
 # Verify the CLI works
-python -m openwrt_imagegen --help
-python -m openwrt_imagegen --version
-python -m openwrt_imagegen config --json
+uv run python -m openwrt_imagegen --help
+uv run python -m openwrt_imagegen --version
+uv run python -m openwrt_imagegen config --json
 ```
 
 ## Development

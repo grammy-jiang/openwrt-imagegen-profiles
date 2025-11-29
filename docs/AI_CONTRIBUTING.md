@@ -12,9 +12,9 @@ If you are an AI making changes here, follow this as a hard contract.
 - Manage **profiles, builds, and artifacts in a database via an ORM**.
 - Build and **safely flash** OpenWrt images to TF/SD cards for multiple devices.
 - Offer **three frontends** over the same Python core:
-  - CLI
-  - Web interface
-  - MCP server
+  - CLI (`openwrt_imagegen/cli.py`)
+  - FastAPI web API (`web/`)
+  - MCP server (`mcp_server/`)
 
 This repo is _not_ trying to replace the OpenWrt SDK/buildroot or be a general OpenWrt toolkit.
 

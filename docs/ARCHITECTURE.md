@@ -38,11 +38,12 @@ The goal is to make it easy for both humans and AI agents to request reproducibl
 
 ---
 
-## Core package design (planned)
+## Core package design
 
 `openwrt_imagegen/` is the single Python package. Subpackages and their responsibilities:
 
 - `openwrt_imagegen/imagebuilder/`
+
   - Discover official Image Builder URLs for `(release, target, subtarget)`.
   - Download/verify archives, extract to cache roots, record metadata, and manage cache pruning (see [BUILD_PIPELINE.md](BUILD_PIPELINE.md)).
   - Expose “ensure builder present” and cache state/query APIs.
@@ -52,6 +53,7 @@ The goal is to make it easy for both humans and AI agents to request reproducibl
     - `service.py`: high-level functions `ensure_builder(...)`, `list_builders(...)`, `prune_builders(...)`, with locking.
 
 - `openwrt_imagegen/profiles/`
+
   - ORM models for profiles; validation and import/export (YAML/JSON/TOML).
   - Query APIs (by `profile_id`, tag, release, target/subtarget).
   - Profile CRUD (when enabled) with history/version-awareness where applicable.
@@ -62,6 +64,7 @@ The goal is to make it easy for both humans and AI agents to request reproducibl
     - `service.py`: CRUD/query APIs, tag/filter search, batch selection resolution.
 
 - `openwrt_imagegen/builds/`
+
   - Build orchestration: cache-key computation, overlay staging, calling Image Builder, artifact discovery, manifest generation.
   - BuildRecord and Artifact ORM models; cache lookup and cache-hit handling.
   - Batch build orchestration (multi-profile) with per-profile results.
@@ -75,6 +78,7 @@ The goal is to make it easy for both humans and AI agents to request reproducibl
     - `service.py`: high-level `build_or_reuse(...)`, `build_batch(...)`, `list_builds(...)`, with locking and concurrency limits.
 
 - `openwrt_imagegen/flash/`
+
   - Flash workflows adhering to [SAFETY.md](SAFETY.md): device validation, optional wipe, write, hash verification, logging.
   - Optional FlashRecord model for audit trails.
   - Key components:
@@ -84,17 +88,20 @@ The goal is to make it easy for both humans and AI agents to request reproducibl
     - `service.py`: high-level `flash_artifact(...)` / `flash_image(...)` with dry-run and force flags.
 
 - `openwrt_imagegen/config.py`
+
   - Config/env parsing (pydantic), defaults for paths (cache/artifacts/DB/tmp), and feature toggles (offline mode, concurrency limits).
   - Expose a single `Settings` object and helper to render effective config as JSON.
 
 - `openwrt_imagegen/__main__.py` or `cli.py`
+
   - Thin CLI that delegates to the above modules; argument parsing only.
 
-- `web/` (planned)
+- `web/`
+
   - FastAPI app exposing HTTP endpoints that proxy to `openwrt_imagegen` APIs.
 
-- `mcp_server/` (planned)
-  - Starlette/FastAPI-based MCP server implementing tools described in [FRONTENDS.md](FRONTENDS.md).
+- `mcp_server/`
+  - FastMCP-based MCP server implementing tools described in [FRONTENDS.md](FRONTENDS.md).
 
 All shared types (e.g., dataclasses for request/response payloads) should live in a small `openwrt_imagegen/types.py` or equivalent to avoid cycles.
 
@@ -108,6 +115,7 @@ All shared types (e.g., dataclasses for request/response payloads) should live i
 - **Automation/CI**: invoke CLI or MCP with JSON outputs; rely on stable exit codes defined in [OPERATIONS.md](OPERATIONS.md).
 
 Data flow (build request):
+
 1. Resolve profile(s) (DB + validation).
 2. Ensure Image Builder present (download/verify/cache).
 3. Compute cache key (profile snapshot + overlays hash + options).
@@ -117,12 +125,14 @@ Data flow (build request):
 7. Return structured result (status, cache_hit, artifacts, log path).
 
 Data flow (flash request):
+
 1. Resolve artifact (by ID or path) and checksum.
 2. Validate device path (whole-device only).
 3. Optional wipe; write with fsync; verify hash (full or prefix).
 4. Log and persist flash record (if model exists); return status and log path.
 
 Sequence (batch build request):
+
 1. Resolve profile set (explicit list or filter) and persist the resolved list.
 2. For each profile: ensure builder, compute cache key, acquire lock.
 3. Reuse cached builds when present; queue new builds respecting concurrency limits.
@@ -362,7 +372,7 @@ For a quick, human- and AI-oriented summary of the project purpose and outcomes,
 
 ---
 
-## Expected Directory Layout (planned)
+## Expected Directory Layout
 
 The exact package names may evolve, but the architecture assumes a layout along these lines:
 
@@ -378,10 +388,10 @@ The exact package names may evolve, but the architecture assumes a layout along 
   - `flash/` – TF card flashing workflows and safety checks.
   - `cli.py` or `__main__.py` – thin CLI wrapper over the library.
 
-- `web/` (optional, planned) \
-  Web application that provides a GUI, backed by the same orchestration APIs.
+- `web/` \
+  Web application that provides an HTTP API (and optional GUI) backed by the same orchestration APIs.
 
-- `mcp_server/` (optional, planned) \
+- `mcp_server/` \
   MCP server implementation that exposes profile, build, and flash operations to external tools.
 
 - `docs/` \
@@ -392,7 +402,7 @@ The exact package names may evolve, but the architecture assumes a layout along 
 
 All OpenWrt- and build-related business logic should live under `openwrt_imagegen/`. Frontends (`cli.py`, `web/`, `mcp_server/`) should call these library functions rather than implementing their own build or flash flows.
 
-This structure is intended as guidance for future code rather than a strict requirement, but AI agents should default to these locations and separations when adding new functionality.
+This structure matches the current implementation and should be preserved when adding new functionality.
 
 ---
 
