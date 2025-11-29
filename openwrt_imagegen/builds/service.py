@@ -623,7 +623,9 @@ def resolve_batch_profiles(
     )
 
     # If explicit profile IDs provided, fetch those
-    if filter_spec.profile_ids:
+    if filter_spec.profile_ids is not None:
+        if not filter_spec.profile_ids:  # Empty list
+            return []  # No profiles to build
         profiles = []
         for pid in filter_spec.profile_ids:
             try:
@@ -721,7 +723,12 @@ def build_batch(
         # Reorder profiles to match the order specified by profile_ids
         if not stopped_early:
             profile_dict = {p.profile_id: p for p in profiles}
-            profiles = [profile_dict[pid] for pid in filter_spec.profile_ids if pid in profile_dict]
+            profiles = [
+                profile_dict[pid]
+                for pid in filter_spec.profile_ids
+                if pid in profile_dict
+            ]
+
     def _check_fail_fast() -> bool:
         """Check if batch should stop due to fail-fast mode."""
         return mode == BatchMode.FAIL_FAST

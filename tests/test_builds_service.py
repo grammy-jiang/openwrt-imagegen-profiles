@@ -491,6 +491,21 @@ class TestBatchBuild:
         assert len(profiles) == 1
         assert profiles[0].profile_id == "test.service"
 
+    def test_resolve_batch_profiles_empty_list(self, session, profile):
+        """Should return empty list when profile_ids is an empty list."""
+        # profile fixture is needed to create profile in DB
+        _ = profile  # noqa: F841
+
+        from openwrt_imagegen.builds.service import (
+            BatchBuildFilter,
+            resolve_batch_profiles,
+        )
+
+        filter_spec = BatchBuildFilter(profile_ids=[])
+        profiles = resolve_batch_profiles(session, filter_spec)
+
+        assert len(profiles) == 0
+
     def test_batch_build_filter_model(self):
         """Should create batch build filter from values."""
         from openwrt_imagegen.builds.service import BatchBuildFilter
