@@ -257,6 +257,4 @@ def batch_build_endpoint(
         mode=batch_mode,
         force_rebuild=request.force_rebuild,
     )
-    db.commit()
-
     return result.model_dump()
