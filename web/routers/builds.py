@@ -121,7 +121,7 @@ def list_builds_endpoint(
             db_profile_id = profile_obj.id
         except ProfileNotFoundError:
             raise HTTPException(
-                status_code=404,
+                status_code=http_status.HTTP_404_NOT_FOUND,
                 detail={
                     "code": "profile_not_found",
                     "message": f"Profile not found: {profile}",
