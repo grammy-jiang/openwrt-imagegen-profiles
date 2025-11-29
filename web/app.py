@@ -12,10 +12,11 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
 from openwrt_imagegen import __version__
 from openwrt_imagegen.db import create_all_tables, get_engine, get_session_factory
-from web.routers import builders, builds, config, flash, health, profiles
+from web.routers import builders, builds, config, flash, gui, health, profiles
 
 
 @asynccontextmanager
@@ -44,6 +45,9 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    # Mount static files for GUI
+    application.mount("/static", StaticFiles(directory="web/static"), name="static")
+
     # Include routers
     application.include_router(health.router, tags=["health"])
     application.include_router(config.router, prefix="/config", tags=["config"])
@@ -51,6 +55,9 @@ def create_app() -> FastAPI:
     application.include_router(builders.router, prefix="/builders", tags=["builders"])
     application.include_router(builds.router, prefix="/builds", tags=["builds"])
     application.include_router(flash.router, prefix="/flash", tags=["flash"])
+
+    # Include GUI router for server-rendered pages
+    application.include_router(gui.router, prefix="/ui", tags=["gui"])
 
     return application
 

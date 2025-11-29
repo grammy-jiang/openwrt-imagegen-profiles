@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block title %}Profiles - OpenWrt Image Generator{% endblock %}
+
+{% block content %}
+<h2>Profiles</h2>
+
+<form class="filter-bar" method="get" action="{{ url_for('gui_profiles_list') }}">
+    <div class="form-group">
+        <label for="target">Target</label>
+        <input type="text" id="target" name="target" value="{{ target or '' }}" placeholder="e.g., ath79">
+    </div>
+    
+    <div class="form-group">
+        <label for="release">Release</label>
+        <input type="text" id="release" name="release" value="{{ release or '' }}" placeholder="e.g., 23.05.2">
+    </div>
+    
+    <div class="form-group">
+        <label for="device_id">Device ID</label>
+        <input type="text" id="device_id" name="device_id" value="{{ device_id or '' }}" placeholder="e.g., tplink-archer-c7">
+    </div>
+    
+    <div class="form-group">
+        <label for="tag">Tag</label>
+        <input type="text" id="tag" name="tag" value="{{ tag or '' }}" placeholder="e.g., router">
+    </div>
+    
+    <button type="submit" class="btn btn-primary">Filter</button>
+    {% if target or release or device_id or tag %}
+    <a href="{{ url_for('gui_profiles_list') }}" class="btn btn-secondary">Clear</a>
+    {% endif %}
+</form>
+
+{% if profiles %}
+<table>
+    <thead>
+        <tr>
+            <th>Profile ID</th>
+            <th>Name</th>
+            <th>Device ID</th>
+            <th>Release</th>
+            <th>Target / Subtarget</th>
+            <th>Tags</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for profile in profiles %}
+        <tr>
+            <td>
+                <a href="{{ url_for('gui_profile_detail', profile_id=profile.profile_id) }}">
+                    {{ profile.profile_id }}
+                </a>
+            </td>
+            <td>{{ profile.name or '-' }}</td>
+            <td><code>{{ profile.device_id }}</code></td>
+            <td>{{ profile.openwrt_release }}</td>
+            <td>{{ profile.target }}/{{ profile.subtarget }}</td>
+            <td>
+                {% for tag in (profile.tags or []) %}
+                <span class="tag">{{ tag }}</span>
+                {% endfor %}
+            </td>
+            <td>
+                <a href="{{ url_for('gui_profile_detail', profile_id=profile.profile_id) }}" class="btn btn-small btn-secondary">View</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<div class="card">
+    <p class="text-muted text-center">No profiles found{% if target or release or device_id or tag %} matching filters{% endif %}.</p>
+</div>
+{% endif %}
+{% endblock %}

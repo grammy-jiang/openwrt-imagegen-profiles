@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block title %}Flash Wizard - OpenWrt Image Generator{% endblock %}
+
+{% block content %}
+<h2>Flash Wizard</h2>
+
+<div class="actions-bar">
+    <a href="{{ url_for('gui_flash_list') }}" class="btn btn-secondary">← Back to Flash Records</a>
+</div>
+
+<div class="flash-warning">
+    <h4>⚠️ Warning: Destructive Operation</h4>
+    <p>Flashing will <strong>completely overwrite</strong> all data on the target device. This operation cannot be undone.</p>
+    <ul>
+        <li>Double-check the device path before proceeding</li>
+        <li>Ensure no important data is on the target device</li>
+        <li>The device must be a whole disk (e.g., <code>/dev/sdb</code>), not a partition</li>
+        <li>Unmount the device before flashing</li>
+    </ul>
+</div>
+
+<form method="post" action="{{ url_for('gui_flash_start') }}" class="card">
+    <h3>Flash Configuration</h3>
+    
+    {% if artifact %}
+    <div class="alert alert-info">
+        <strong>Selected Artifact:</strong> {{ artifact.filename }}<br>
+        <strong>Size:</strong> {{ "%.2f MB"|format(artifact.size_bytes / 1024 / 1024) if artifact.size_bytes else 'Unknown' }}<br>
+        <strong>SHA256:</strong> <code>{{ artifact.sha256[:32] }}...</code> (if available)
+    </div>
+    <input type="hidden" name="artifact_id" value="{{ artifact.id }}">
+    {% else %}
+    <div class="form-group">
+        <label for="artifact_id">Artifact ID <span class="text-danger">*</span></label>
+        <input type="number" id="artifact_id" name="artifact_id" required placeholder="Enter artifact ID">
+        <p class="form-help">Enter the ID of the artifact to flash. You can find this in the build details page.</p>
+    </div>
+    {% endif %}
+    
+    <div class="form-group">
+        <label for="device_path">Device Path <span class="text-danger">*</span></label>
+        <input type="text" id="device_path" name="device_path" required 
+               placeholder="/dev/sdX" pattern="^/dev/[a-zA-Z0-9]+$"
+               value="{{ device_path or '' }}">
+        <p class="form-help">
+            Enter the full device path (e.g., <code>/dev/sdb</code> or <code>/dev/mmcblk0</code>).
+            <strong>Do NOT use partition paths</strong> like <code>/dev/sdb1</code>.
+        </p>
+    </div>
+    
+    <div class="confirmation-box">
+        <h4>Confirmation Required</h4>
+        <p>To proceed, type the device path exactly as entered above:</p>
+        <div class="form-group">
+            <label for="confirmation">Confirm Device Path <span class="text-danger">*</span></label>
+            <input type="text" id="confirmation" name="confirmation" required
+                   placeholder="Type device path to confirm">
+        </div>
+    </div>
+    
+    <div class="form-group">
+        <label>
+            <input type="checkbox" name="wipe_before" value="true">
+            Wipe device before flashing
+        </label>
+        <p class="form-help">Clear existing filesystem signatures before writing the image.</p>
+    </div>
+    
+    <div class="form-group">
+        <label>
+            <input type="checkbox" name="dry_run" value="true" checked>
+            Dry run (no actual write)
+        </label>
+        <p class="form-help">Validate the operation without writing to the device. <strong>Recommended for first attempt.</strong></p>
+    </div>
+    
+    <div class="form-group">
+        <label>
+            <input type="checkbox" name="force" value="true">
+            Force (required for actual write)
+        </label>
+        <p class="form-help">
+            <strong class="text-danger">Required</strong> to perform actual writes when dry_run is unchecked.
+            This confirms you understand the risks.
+        </p>
+    </div>
+    
+    <hr>
+    
+    <div class="form-group">
+        <button type="submit" class="btn btn-warning">Start Flash Operation</button>
+    </div>
+</form>
+
+<div class="card">
+    <h3>How to Identify Your TF/SD Card Device</h3>
+    <p>Use these commands to identify the correct device:</p>
+    <pre><code># List all block devices with sizes
+lsblk -d -o NAME,SIZE,MODEL,TRAN
+
+# Show detailed device info
+fdisk -l
+
+# Watch for device appearance when inserting card
+dmesg | tail -20</code></pre>
+    <p><strong>Important:</strong></p>
+    <ul>
+        <li>Look for the device that matches your TF/SD card size</li>
+        <li>Never use your system drive (usually <code>/dev/sda</code> or <code>/dev/nvme0n1</code>)</li>
+        <li>USB card readers typically appear as <code>/dev/sd*</code></li>
+        <li>Built-in card readers may appear as <code>/dev/mmcblk*</code></li>
+    </ul>
+</div>
+{% endblock %}
