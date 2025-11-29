@@ -88,20 +88,6 @@ def client_with_profile(client):
     return client
 
 
-@pytest.fixture
-def sample_profile_data():
-    """Sample profile data for testing."""
-    return {
-        "profile_id": "test.router.2305",
-        "name": "Test Router",
-        "device_id": "test-router",
-        "openwrt_release": "23.05.2",
-        "target": "ath79",
-        "subtarget": "generic",
-        "imagebuilder_profile": "tplink_archer-c7-v2",
-        "tags": ["test", "router"],
-        "packages": ["luci", "luci-ssl"],
-    }
 
 
 class TestDashboard:
