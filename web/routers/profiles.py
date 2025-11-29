@@ -120,7 +120,6 @@ def create_profile_endpoint(
     """
     try:
         profile = create_profile(db, profile_data)
-        db.commit()
         return profile_to_schema(profile).model_dump(exclude_none=True)
     except ProfileExistsError:
         raise HTTPException(
