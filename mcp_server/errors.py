@@ -10,7 +10,6 @@ from typing import Any
 
 # Error code constants aligned with OPERATIONS.md
 VALIDATION_ERROR = "validation"
-NOT_FOUND_ERROR = "not_found"
 BUILD_ERROR = "build_failed"
 CACHE_CONFLICT_ERROR = "cache_conflict"
 FLASH_ERROR = "flash_error"
@@ -80,15 +79,6 @@ def validation_error(message: str, details: dict[str, Any] | None = None) -> MCP
     return make_error(VALIDATION_ERROR, message, details)
 
 
-def not_found_error(
-    resource_type: str, resource_id: str | int, details: dict[str, Any] | None = None
-) -> MCPError:
-    """Create a not found error."""
-    return make_error(
-        NOT_FOUND_ERROR, f"{resource_type} not found: {resource_id}", details
-    )
-
-
 def profile_not_found(profile_id: str) -> MCPError:
     """Create a profile not found error."""
     return make_error(
@@ -154,7 +144,6 @@ __all__ = [
     "IMAGEBUILDER_ERROR",
     "INTERNAL_ERROR",
     "MCPError",
-    "NOT_FOUND_ERROR",
     "PERMISSION_ERROR",
     "PRECONDITION_ERROR",
     "PROFILE_NOT_FOUND",
@@ -165,7 +154,6 @@ __all__ = [
     "device_error",
     "flash_error",
     "make_error",
-    "not_found_error",
     "profile_not_found",
     "validation_error",
 ]

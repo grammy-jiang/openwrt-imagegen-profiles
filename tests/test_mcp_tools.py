@@ -104,9 +104,7 @@ class TestListProfiles:
         assert len(result.profiles) == 1
         assert result.profiles[0].profile_id == sample_profile_data["profile_id"]
 
-    def test_list_profiles_with_filter(
-        self, session_with_profile, sample_profile_data
-    ):
+    def test_list_profiles_with_filter(self, session_with_profile, sample_profile_data):
         """Test filtering profiles by release."""
         from mcp_server.server import list_profiles
 
@@ -230,9 +228,7 @@ class TestBuildImagesBatch:
         )
         assert result.mode == "fail-fast"
 
-    def test_batch_build_returns_per_profile_results(
-        self, sample_profile_data
-    ):
+    def test_batch_build_returns_per_profile_results(self, sample_profile_data):
         """Test that batch build returns per-profile results."""
         from mcp_server.server import build_images_batch
         from openwrt_imagegen.profiles.schema import ProfileSchema

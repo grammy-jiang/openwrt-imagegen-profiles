@@ -17,7 +17,6 @@ from sqlalchemy import select
 
 from mcp_server.errors import (
     INTERNAL_ERROR,
-    MCPError,
     artifact_not_found,
     build_not_found,
     flash_error,
@@ -57,45 +56,6 @@ def _get_session_factory() -> Any:
     engine = get_engine()
     create_all_tables(engine)
     return get_session_factory(engine)
-
-
-def _error_response(error: MCPError, response_type: type) -> dict[str, Any]:
-    """Create an error response.
-
-    Args:
-        error: MCPError instance.
-        response_type: Response model class (for extracting required fields).
-
-    Returns:
-        Dictionary suitable for JSON response.
-    """
-    # Build a minimal response with error details
-    response: dict[str, Any] = {
-        "success": False,
-        "error": error.to_dict(),
-    }
-    # Add default values for list responses
-    if hasattr(response_type, "model_fields"):
-        fields = response_type.model_fields
-        if "total" in fields:
-            response["total"] = 0
-        if "profiles" in fields:
-            response["profiles"] = []
-        if "builds" in fields:
-            response["builds"] = []
-        if "artifacts" in fields:
-            response["artifacts"] = []
-        if "results" in fields:
-            response["results"] = []
-        if "succeeded" in fields:
-            response["succeeded"] = 0
-        if "failed" in fields:
-            response["failed"] = 0
-        if "cache_hits" in fields:
-            response["cache_hits"] = 0
-        if "mode" in fields:
-            response["mode"] = "best-effort"
-    return response
 
 
 @mcp.tool()

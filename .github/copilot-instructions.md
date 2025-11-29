@@ -50,6 +50,11 @@ The package structure:
   - `app.py`: FastAPI application factory
   - `deps.py`: Database dependency injection
   - `routers/`: API route handlers (health, config, profiles, builders, builds, flash)
+- `mcp_server/`: MCP (Model Context Protocol) server for AI tools
+  - `__init__.py`: Package marker, exports mcp server instance
+  - `server.py`: FastMCP server setup with tool definitions
+  - `errors.py`: Structured error types with stable codes
+  - `schemas.py`: Pydantic response schemas for MCP tools
 - `alembic/`: Database migration scripts
   - `env.py`: Alembic environment configuration
   - `versions/`: Migration files
