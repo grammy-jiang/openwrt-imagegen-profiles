@@ -702,21 +702,26 @@ def build_batch(
         found_ids = {p.profile_id for p in profiles}
         missing_profile_ids = set(filter_spec.profile_ids) - found_ids
 
-        # Add error results for missing profiles
-        for pid in missing_profile_ids:
-            result = ProfileBuildResult(
-                profile_id=pid,
-                success=False,
-                error_code="profile_not_found",
-                error_message=f"Profile not found: {pid}",
-            )
-            results.append(result)
-            failed += 1
+        # Add error results for missing profiles, in the order specified by profile_ids
+        for pid in filter_spec.profile_ids:
+            if pid in missing_profile_ids:
+                result = ProfileBuildResult(
+                    profile_id=pid,
+                    success=False,
+                    error_code="profile_not_found",
+                    error_message=f"Profile not found: {pid}",
+                )
+                results.append(result)
+                failed += 1
 
-            if mode == BatchMode.FAIL_FAST:
-                stopped_early = True
-                break
+                if mode == BatchMode.FAIL_FAST:
+                    stopped_early = True
+                    break
 
+        # Reorder profiles to match the order specified by profile_ids
+        if not stopped_early:
+            profile_dict = {p.profile_id: p for p in profiles}
+            profiles = [profile_dict[pid] for pid in filter_spec.profile_ids if pid in profile_dict]
     def _check_fail_fast() -> bool:
         """Check if batch should stop due to fail-fast mode."""
         return mode == BatchMode.FAIL_FAST
