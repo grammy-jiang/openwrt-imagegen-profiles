@@ -91,21 +91,60 @@ app.add_typer(profiles_app, name="profiles")
 
 @profiles_app.command("list")
 def profiles_list(
+    device_id: Annotated[
+        str | None,
+        typer.Option("--device", "-d", help="Filter by device ID"),
+    ] = None,
+    release: Annotated[
+        str | None,
+        typer.Option("--release", "-r", help="Filter by OpenWrt release"),
+    ] = None,
+    target: Annotated[
+        str | None,
+        typer.Option("--target", "-t", help="Filter by target"),
+    ] = None,
+    subtarget: Annotated[
+        str | None,
+        typer.Option("--subtarget", "-s", help="Filter by subtarget"),
+    ] = None,
+    tags: Annotated[
+        list[str] | None,
+        typer.Option("--tag", help="Filter by tag (can be repeated)"),
+    ] = None,
     json_output: Annotated[
         bool,
         typer.Option("--json", help="Output as JSON"),
     ] = False,
 ) -> None:
-    """List all profiles in the database."""
+    """List profiles in the database.
+
+    Supports filtering by device, release, target, subtarget, and tags.
+    Use --json for machine-readable output.
+    """
     from openwrt_imagegen.db import create_all_tables, get_engine, get_session_factory
-    from openwrt_imagegen.profiles.service import list_profiles, profile_to_schema
+    from openwrt_imagegen.profiles.service import (
+        list_profiles,
+        profile_to_schema,
+        query_profiles,
+    )
 
     engine = get_engine()
     create_all_tables(engine)
     factory = get_session_factory(engine)
 
     with factory() as session:
-        profiles = list_profiles(session)
+        # Use query_profiles if any filters are specified, otherwise list_profiles
+        if any([device_id, release, target, subtarget, tags]):
+            profiles = query_profiles(
+                session,
+                device_id=device_id,
+                openwrt_release=release,
+                target=target,
+                subtarget=subtarget,
+                tags=tags,
+            )
+        else:
+            profiles = list_profiles(session)
 
         if not profiles:
             if json_output:
@@ -908,6 +947,56 @@ def artifacts_list(
                 console.print()
 
 
+@artifacts_app.command("show")
+def artifacts_show(
+    artifact_id: Annotated[int, typer.Argument(help="Artifact ID to show")],
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Output as JSON"),
+    ] = False,
+) -> None:
+    """Show details of a specific artifact."""
+    from openwrt_imagegen.builds.models import Artifact
+    from openwrt_imagegen.db import create_all_tables, get_engine, get_session_factory
+
+    engine = get_engine()
+    create_all_tables(engine)
+    factory = get_session_factory(engine)
+
+    with factory() as session:
+        artifact = session.get(Artifact, artifact_id)
+
+        if artifact is None:
+            console.print(f"[red]Artifact not found: {artifact_id}[/red]")
+            raise typer.Exit(code=1)
+
+        if json_output:
+            output = {
+                "id": artifact.id,
+                "build_id": artifact.build_id,
+                "kind": artifact.kind,
+                "filename": artifact.filename,
+                "relative_path": artifact.relative_path,
+                "absolute_path": artifact.absolute_path,
+                "size_bytes": artifact.size_bytes,
+                "sha256": artifact.sha256,
+                "labels": artifact.labels,
+            }
+            console.print(json.dumps(output, indent=2))
+        else:
+            console.print(f"[bold]Artifact #{artifact.id}[/bold]")
+            console.print()
+            console.print(f"  Build ID:      {artifact.build_id}")
+            console.print(f"  Kind:          {artifact.kind or 'unknown'}")
+            console.print(f"  Filename:      {artifact.filename}")
+            console.print(f"  Relative path: {artifact.relative_path}")
+            console.print(f"  Absolute path: {artifact.absolute_path or 'N/A'}")
+            console.print(f"  Size:          {artifact.size_bytes:,} bytes")
+            console.print(f"  SHA256:        {artifact.sha256}")
+            if artifact.labels:
+                console.print(f"  Labels:        {', '.join(artifact.labels)}")
+
+
 flash_app = typer.Typer(help="Flash images to TF/SD cards")
 app.add_typer(flash_app, name="flash")
 
@@ -1140,6 +1229,123 @@ def flash_image_cmd(
     except Exception as e:
         console.print(f"[red]Flash failed: {e}[/red]")
         raise typer.Exit(code=1) from None
+
+
+@flash_app.command("list")
+def flash_list(
+    artifact_id: Annotated[
+        int | None,
+        typer.Option("--artifact-id", "-a", help="Filter by artifact ID"),
+    ] = None,
+    build_id: Annotated[
+        int | None,
+        typer.Option("--build-id", "-b", help="Filter by build ID"),
+    ] = None,
+    device_path: Annotated[
+        str | None,
+        typer.Option("--device", "-d", help="Filter by device path"),
+    ] = None,
+    status: Annotated[
+        str | None,
+        typer.Option(
+            "--status", "-s", help="Filter by status (pending/running/succeeded/failed)"
+        ),
+    ] = None,
+    limit: Annotated[
+        int,
+        typer.Option("--limit", "-l", help="Maximum number of records to return"),
+    ] = 100,
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Output as JSON"),
+    ] = False,
+) -> None:
+    """List flash records.
+
+    Shows history of flash operations with optional filters.
+    """
+    from openwrt_imagegen.db import create_all_tables, get_engine, get_session_factory
+    from openwrt_imagegen.flash.service import get_flash_records
+    from openwrt_imagegen.types import FlashStatus
+
+    engine = get_engine()
+    create_all_tables(engine)
+    factory = get_session_factory(engine)
+
+    # Parse status filter
+    status_filter: FlashStatus | None = None
+    if status:
+        try:
+            status_filter = FlashStatus(status)
+        except ValueError:
+            console.print(f"[red]Invalid status: {status}[/red]")
+            console.print("Valid values: pending, running, succeeded, failed")
+            raise typer.Exit(code=1) from None
+
+    with factory() as session:
+        records = get_flash_records(
+            session,
+            artifact_id=artifact_id,
+            build_id=build_id,
+            device_path=device_path,
+            status=status_filter,
+            limit=limit,
+        )
+
+        if not records:
+            if json_output:
+                console.print("[]")
+            else:
+                console.print("[yellow]No flash records found[/yellow]")
+            return
+
+        if json_output:
+            output = [
+                {
+                    "id": r.id,
+                    "artifact_id": r.artifact_id,
+                    "build_id": r.build_id,
+                    "device_path": r.device_path,
+                    "device_model": r.device_model,
+                    "device_serial": r.device_serial,
+                    "status": r.status,
+                    "wiped_before_flash": r.wiped_before_flash,
+                    "verification_mode": r.verification_mode,
+                    "verification_result": r.verification_result,
+                    "requested_at": r.requested_at.isoformat()
+                    if r.requested_at
+                    else None,
+                    "started_at": r.started_at.isoformat() if r.started_at else None,
+                    "finished_at": r.finished_at.isoformat() if r.finished_at else None,
+                    "error_type": r.error_type,
+                    "error_message": r.error_message,
+                    "log_path": r.log_path,
+                }
+                for r in records
+            ]
+            console.print(json.dumps(output, indent=2))
+        else:
+            console.print(f"[bold]Found {len(records)} flash record(s):[/bold]")
+            console.print()
+            for r in records:
+                status_color = {
+                    "succeeded": "green",
+                    "failed": "red",
+                    "running": "blue",
+                    "pending": "yellow",
+                }.get(r.status, "white")
+                console.print(f"  [{status_color}]Flash #{r.id}[/{status_color}]")
+                console.print(f"    Artifact ID: {r.artifact_id}")
+                console.print(f"    Build ID: {r.build_id}")
+                console.print(f"    Device: {r.device_path}")
+                console.print(f"    Status: {r.status}")
+                console.print(f"    Verification: {r.verification_result or 'N/A'}")
+                console.print(
+                    f"    Requested: {r.requested_at.isoformat() if r.requested_at else 'N/A'}"
+                )
+                if r.error_message:
+                    console.print(f"    Error: {r.error_message}")
+                console.print()
 
 
 if __name__ == "__main__":
