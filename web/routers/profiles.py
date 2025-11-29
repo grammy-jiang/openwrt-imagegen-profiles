@@ -161,7 +161,6 @@ def update_profile_endpoint(
 
     try:
         profile = update_profile(db, profile_id, profile_data)
-        db.commit()
         return profile_to_schema(profile).model_dump(exclude_none=True)
     except ProfileNotFoundError:
         raise HTTPException(
@@ -189,7 +188,6 @@ def delete_profile_endpoint(
     """
     try:
         delete_profile(db, profile_id)
-        db.commit()
     except ProfileNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

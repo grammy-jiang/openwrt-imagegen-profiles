@@ -184,7 +184,6 @@ def ensure_builder_endpoint(
             settings=settings,
             force_download=request.force_download,
         )
-        db.commit()
         return _builder_to_dict(builder)
     except OfflineModeError:
         raise HTTPException(
@@ -234,9 +233,6 @@ def prune_builders_endpoint(
         settings=settings,
         dry_run=request.dry_run,
     )
-
-    if not request.dry_run:
-        db.commit()
 
     return {
         "dry_run": request.dry_run,

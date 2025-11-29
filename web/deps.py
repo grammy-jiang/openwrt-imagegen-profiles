@@ -1,6 +1,15 @@
 """Database session dependency for FastAPI.
 
 Provides a database session to route handlers via FastAPI dependency injection.
+
+Transaction boundaries are managed here:
+- Session is created at request start
+- On success (no exception): session is committed automatically
+- On exception: session is rolled back automatically
+- Session is closed after request completes
+
+This approach ensures consistent transaction boundaries across all endpoints
+and removes the need for manual db.commit() calls in route handlers.
 """
 
 from __future__ import annotations
@@ -30,8 +39,11 @@ def get_db(
 ) -> Generator[Session, None, None]:
     """Provide a database session for a request.
 
-    Creates a session at the start of the request and closes it
-    when the request completes.
+    Creates a session at the start of the request. Transaction boundaries
+    are managed automatically:
+    - Commits on successful completion (no exception)
+    - Rolls back on any exception
+    - Closes the session after request completes
 
     Yields:
         Database session.
@@ -39,5 +51,11 @@ def get_db(
     session = session_factory()
     try:
         yield session
+        # Commit on success - only reached if no exception was raised
+        session.commit()
+    except Exception:
+        # Rollback on any exception
+        session.rollback()
+        raise
     finally:
         session.close()

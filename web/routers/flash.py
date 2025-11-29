@@ -143,9 +143,6 @@ def flash_artifact_endpoint(
             force=request.force,
         )
 
-        # Transaction boundaries (commit/rollback) are managed by the session dependency (see web.deps.get_db).
-        # No manual commit here; session is committed automatically if no exception occurs.
-
         return {
             "success": result.success,
             "flash_record_id": result.flash_record_id,
