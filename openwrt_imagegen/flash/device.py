@@ -273,8 +273,8 @@ def get_device_size(device_path: str) -> int | None:
             # Size is in 512-byte sectors
             sectors = int(size_path.read_text().strip())
             return sectors * 512
-    except (OSError, ValueError):
-        pass
+    except (OSError, ValueError) as e:
+        logger.warning(f"Could not read device size for {device_path}: {e}")
 
     return None
 
