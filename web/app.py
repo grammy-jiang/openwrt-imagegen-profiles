@@ -10,16 +10,12 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING
 
 from fastapi import FastAPI
 
 from openwrt_imagegen import __version__
 from openwrt_imagegen.db import create_all_tables, get_engine, get_session_factory
 from web.routers import builders, builds, config, flash, health, profiles
-
-if TYPE_CHECKING:
-    pass
 
 
 @asynccontextmanager
