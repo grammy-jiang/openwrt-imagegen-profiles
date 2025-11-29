@@ -678,9 +678,11 @@ def build_batch_cmd(
         if not json_output:
             console.print("[blue]Starting batch build...[/blue]")
 
+        settings = get_settings()
         result = build_batch(
             session=session,
             filter_spec=filter_spec,
+            settings=settings,
             mode=batch_mode,
             force_rebuild=force,
         )
