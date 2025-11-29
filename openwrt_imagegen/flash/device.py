@@ -189,8 +189,19 @@ def get_mount_points(device_path: str) -> list[str]:
                     mount_point = parts[1]
 
                     # Check if this is the device or one of its partitions
+                    # Must be exact match or device name followed by a digit (partition)
                     mounted_name = Path(mounted_device).name
-                    if mounted_name.startswith(device_name):
+                    if mounted_name == device_name:
+                        mount_points.append(mount_point)
+                    elif (
+                        mounted_name.startswith(device_name)
+                        and len(mounted_name) > len(device_name)
+                        and (
+                            mounted_name[len(device_name)].isdigit()
+                            or mounted_name[len(device_name)] == "p"
+                        )
+                    ):
+                        # Matches partitions like sda1, sda2 or mmcblk0p1, nvme0n1p1
                         mount_points.append(mount_point)
     except OSError:
         # If we can't read /proc/mounts, assume nothing is mounted

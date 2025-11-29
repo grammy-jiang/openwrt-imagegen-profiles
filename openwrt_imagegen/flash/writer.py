@@ -333,9 +333,7 @@ def write_image_to_device(
         logger.debug(
             "Computing source hash (mode=%s, bytes=%d)", verification_mode, verify_bytes
         )
-        source_hash, _ = compute_file_hash(
-            image_path, max_bytes=verify_bytes
-        )
+        source_hash, _ = compute_file_hash(image_path, max_bytes=verify_bytes)
     elif expected_hash is not None:
         source_hash = expected_hash
     else:

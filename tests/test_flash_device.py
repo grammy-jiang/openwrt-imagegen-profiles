@@ -161,6 +161,17 @@ class TestGetMountPoints:
             result = get_mount_points("/dev/sdb")
             assert set(result) == {"/mnt/data1", "/mnt/data2"}
 
+    def test_similarly_named_devices_not_matched(self):
+        """Devices like /dev/sdaa should not match when checking /dev/sda."""
+        proc_mounts = """/dev/sda1 / ext4 rw 0 0
+/dev/sdaa1 /mnt/sdaa ext4 rw 0 0
+/dev/sdab1 /mnt/sdab ext4 rw 0 0
+"""
+        with patch("builtins.open", mock_open(read_data=proc_mounts)):
+            # /dev/sda should only match /dev/sda1, not /dev/sdaa1 or /dev/sdab1
+            result = get_mount_points("/dev/sda")
+            assert result == ["/"]
+
     def test_read_error(self):
         """Handle /proc/mounts read error gracefully."""
         with patch("builtins.open", side_effect=OSError("Permission denied")):
