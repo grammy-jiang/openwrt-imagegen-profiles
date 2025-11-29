@@ -272,7 +272,7 @@ def build_detail(
 @router.post("/builds", name="gui_builds_create")
 def builds_create(
     db: DbSession,
-    _settings: AppSettings,  # Reserved for future use
+    settings: AppSettings,  # Reserved for future use
     profile_id: str = Form(...),
     force_rebuild: bool = Form(False),
 ) -> RedirectResponse:
