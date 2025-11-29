@@ -27,7 +27,7 @@
     <div class="alert alert-info">
         <strong>Selected Artifact:</strong> {{ artifact.filename }}<br>
         <strong>Size:</strong> {{ "%.2f MB"|format(artifact.size_bytes / 1024 / 1024) if artifact.size_bytes else 'Unknown' }}<br>
-        <strong>SHA256:</strong> <code>{{ artifact.sha256[:32] }}...</code> (if available)
+        <strong>SHA256:</strong> <code>{{ artifact.sha256[:32] if artifact.sha256 else 'N/A' }}{% if artifact.sha256 %}...{% endif %}</code>
     </div>
     <input type="hidden" name="artifact_id" value="{{ artifact.id }}">
     {% else %}

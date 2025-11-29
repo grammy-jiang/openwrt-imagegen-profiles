@@ -33,6 +33,9 @@ function fallbackCopyToClipboard(text, btn) {
     textArea.select();
     
     try {
+        // Note: document.execCommand('copy') is deprecated but used here as a
+        // fallback for older browsers that don't support the Clipboard API.
+        // Modern browsers will use navigator.clipboard.writeText() instead.
         var successful = document.execCommand('copy');
         showCopyFeedback(btn, successful);
     } catch (err) {
