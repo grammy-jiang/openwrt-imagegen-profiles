@@ -722,10 +722,114 @@ def build_batch_cmd(
 
 
 @builds_app.command("list")
-def builds_list() -> None:
+def builds_list(
+    profile_id: Annotated[
+        str | None,
+        typer.Option("--profile", "-p", help="Filter by profile ID"),
+    ] = None,
+    status: Annotated[
+        str | None,
+        typer.Option(
+            "--status", "-s", help="Filter by status (pending/running/succeeded/failed)"
+        ),
+    ] = None,
+    limit: Annotated[
+        int,
+        typer.Option("--limit", "-l", help="Maximum number of records to return"),
+    ] = 100,
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Output as JSON"),
+    ] = False,
+) -> None:
     """List build records."""
-    console.print("[yellow]Not yet implemented[/yellow]")
-    raise typer.Exit(code=1)
+    from openwrt_imagegen.builds.service import list_builds
+    from openwrt_imagegen.db import create_all_tables, get_engine, get_session_factory
+    from openwrt_imagegen.profiles.service import ProfileNotFoundError, get_profile
+    from openwrt_imagegen.types import BuildStatus
+
+    engine = get_engine()
+    create_all_tables(engine)
+    factory = get_session_factory(engine)
+
+    # Parse status filter
+    status_filter: BuildStatus | None = None
+    if status:
+        try:
+            status_filter = BuildStatus(status)
+        except ValueError:
+            console.print(f"[red]Invalid status: {status}[/red]")
+            console.print("Valid values: pending, running, succeeded, failed")
+            raise typer.Exit(code=1) from None
+
+    with factory() as session:
+        # Resolve profile_id to database ID if provided
+        db_profile_id: int | None = None
+        if profile_id:
+            try:
+                profile = get_profile(session, profile_id)
+                db_profile_id = profile.id
+            except ProfileNotFoundError:
+                console.print(f"[red]Profile not found: {profile_id}[/red]")
+                raise typer.Exit(code=1) from None
+
+        builds = list_builds(
+            session,
+            profile_id=db_profile_id,
+            status=status_filter,
+            limit=limit,
+        )
+
+        if not builds:
+            if json_output:
+                console.print("[]")
+            else:
+                console.print("[yellow]No build records found[/yellow]")
+            return
+
+        if json_output:
+            output = [
+                {
+                    "id": b.id,
+                    "profile_id": b.profile.profile_id if b.profile else None,
+                    "status": b.status,
+                    "cache_key": b.cache_key,
+                    "is_cache_hit": b.is_cache_hit,
+                    "requested_at": b.requested_at.isoformat()
+                    if b.requested_at
+                    else None,
+                    "started_at": b.started_at.isoformat() if b.started_at else None,
+                    "finished_at": b.finished_at.isoformat() if b.finished_at else None,
+                    "log_path": b.log_path,
+                    "error_type": b.error_type,
+                    "error_message": b.error_message,
+                    "artifact_count": len(b.artifacts),
+                }
+                for b in builds
+            ]
+            console.print(json.dumps(output, indent=2))
+        else:
+            console.print(f"[bold]Found {len(builds)} build(s):[/bold]")
+            console.print()
+            for b in builds:
+                status_color = {
+                    "succeeded": "green",
+                    "failed": "red",
+                    "running": "blue",
+                    "pending": "yellow",
+                }.get(b.status, "white")
+                profile_display = b.profile.profile_id if b.profile else "N/A"
+                console.print(f"  [{status_color}]Build #{b.id}[/{status_color}]")
+                console.print(f"    Profile: {profile_display}")
+                console.print(f"    Status: {b.status}")
+                console.print(f"    Cache hit: {b.is_cache_hit}")
+                console.print(
+                    f"    Requested: {b.requested_at.isoformat() if b.requested_at else 'N/A'}"
+                )
+                console.print(f"    Artifacts: {len(b.artifacts)}")
+                if b.error_message:
+                    console.print(f"    Error: {b.error_message}")
+                console.print()
 
 
 artifacts_app = typer.Typer(help="Manage build artifacts")
@@ -736,14 +840,72 @@ app.add_typer(artifacts_app, name="artifacts")
 def artifacts_list(
     build_id: Annotated[
         int | None,
-        typer.Option("--build-id", help="Filter by build ID"),
+        typer.Option("--build-id", "-b", help="Filter by build ID"),
     ] = None,
+    kind: Annotated[
+        str | None,
+        typer.Option("--kind", "-k", help="Filter by artifact kind"),
+    ] = None,
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Output as JSON"),
+    ] = False,
 ) -> None:
     """List artifacts."""
-    console.print(
-        f"[yellow]Not yet implemented: list artifacts (build={build_id})[/yellow]"
-    )
-    raise typer.Exit(code=1)
+    from sqlalchemy import select
+
+    from openwrt_imagegen.builds.models import Artifact
+    from openwrt_imagegen.db import create_all_tables, get_engine, get_session_factory
+
+    engine = get_engine()
+    create_all_tables(engine)
+    factory = get_session_factory(engine)
+
+    with factory() as session:
+        stmt = select(Artifact)
+
+        if build_id is not None:
+            stmt = stmt.where(Artifact.build_id == build_id)
+        if kind is not None:
+            stmt = stmt.where(Artifact.kind == kind)
+
+        stmt = stmt.order_by(Artifact.id.desc()).limit(100)
+        artifacts = list(session.execute(stmt).scalars().all())
+
+        if not artifacts:
+            if json_output:
+                console.print("[]")
+            else:
+                console.print("[yellow]No artifacts found[/yellow]")
+            return
+
+        if json_output:
+            output = [
+                {
+                    "id": a.id,
+                    "build_id": a.build_id,
+                    "kind": a.kind,
+                    "filename": a.filename,
+                    "relative_path": a.relative_path,
+                    "absolute_path": a.absolute_path,
+                    "size_bytes": a.size_bytes,
+                    "sha256": a.sha256,
+                    "labels": a.labels,
+                }
+                for a in artifacts
+            ]
+            console.print(json.dumps(output, indent=2))
+        else:
+            console.print(f"[bold]Found {len(artifacts)} artifact(s):[/bold]")
+            console.print()
+            for a in artifacts:
+                console.print(f"  [green]Artifact #{a.id}[/green]")
+                console.print(f"    Build ID: {a.build_id}")
+                console.print(f"    Kind: {a.kind or 'unknown'}")
+                console.print(f"    Filename: {a.filename}")
+                console.print(f"    Size: {a.size_bytes:,} bytes")
+                console.print(f"    SHA256: {a.sha256[:16]}...")
+                console.print()
 
 
 flash_app = typer.Typer(help="Flash images to TF/SD cards")
@@ -806,7 +968,7 @@ def flash_write(
 
     with factory() as session:
         try:
-            if dry_run:
+            if dry_run and not json_output:
                 console.print("[blue]Dry-run mode: validating without writing[/blue]")
 
             result = flash_artifact(
@@ -928,7 +1090,7 @@ def flash_image_cmd(
             raise typer.Exit(code=0)
 
     try:
-        if dry_run:
+        if dry_run and not json_output:
             console.print("[blue]Dry-run mode: validating without writing[/blue]")
 
         result = flash_image(
