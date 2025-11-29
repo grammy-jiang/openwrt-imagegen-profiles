@@ -14,7 +14,7 @@ from unittest.mock import patch
 
 import pytest
 
-from openwrt_imagegen.db import create_all_tables, get_engine, get_session_factory
+import openwrt_imagegen.db as db_module
 
 
 @pytest.fixture(autouse=True)
@@ -24,8 +24,6 @@ def isolated_db():
     This fixture automatically sets up a fresh temp database for
     each test and patches the db module to use it.
     """
-    import openwrt_imagegen.db as db_module
-
     fd, path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
     db_url = f"sqlite:///{path}"
@@ -37,8 +35,8 @@ def isolated_db():
         db_module._session_factory = None
 
         # Initialize db
-        engine = get_engine()
-        create_all_tables(engine)
+        engine = db_module.get_engine()
+        db_module.create_all_tables(engine)
 
         yield db_url
 
@@ -71,7 +69,7 @@ def session_with_profile(sample_profile_data):
     from openwrt_imagegen.profiles.schema import ProfileSchema
     from openwrt_imagegen.profiles.service import create_profile
 
-    factory = get_session_factory(get_engine())
+    factory = db_module.get_session_factory(db_module.get_engine())
     with factory() as session:
         schema = ProfileSchema(**sample_profile_data)
         create_profile(session, schema)
@@ -234,7 +232,7 @@ class TestBuildImagesBatch:
         from openwrt_imagegen.profiles.schema import ProfileSchema
         from openwrt_imagegen.profiles.service import create_profile
 
-        factory = get_session_factory(get_engine())
+        factory = db_module.get_session_factory(db_module.get_engine())
         with factory() as session:
             # Create profiles
             for i in range(2):
