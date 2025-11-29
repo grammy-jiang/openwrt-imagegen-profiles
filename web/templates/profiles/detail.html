@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+
+{% block title %}{{ profile.profile_id }} - OpenWrt Image Generator{% endblock %}
+
+{% block content %}
+<h2>Profile: {{ profile.profile_id }}</h2>
+
+<div class="actions-bar">
+    <a href="{{ url_for('gui_profiles_list') }}" class="btn btn-secondary">← Back to List</a>
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3>Profile Details</h3>
+        <dl>
+            <dt>Profile ID</dt>
+            <dd><code>{{ profile.profile_id }}</code></dd>
+            
+            <dt>Name</dt>
+            <dd>{{ profile.name or '-' }}</dd>
+            
+            <dt>Description</dt>
+            <dd>{{ profile.description or '-' }}</dd>
+            
+            <dt>Device ID</dt>
+            <dd><code>{{ profile.device_id }}</code></dd>
+            
+            <dt>OpenWrt Release</dt>
+            <dd>{{ profile.openwrt_release }}</dd>
+            
+            <dt>Target</dt>
+            <dd>{{ profile.target }}</dd>
+            
+            <dt>Subtarget</dt>
+            <dd>{{ profile.subtarget }}</dd>
+            
+            <dt>Image Builder Profile</dt>
+            <dd><code>{{ profile.imagebuilder_profile }}</code></dd>
+            
+            <dt>Tags</dt>
+            <dd>
+                {% if profile.tags %}
+                {% for tag in profile.tags %}
+                <span class="tag">{{ tag }}</span>
+                {% endfor %}
+                {% else %}
+                -
+                {% endif %}
+            </dd>
+        </dl>
+    </div>
+    
+    <div class="card">
+        <h3>Build This Profile</h3>
+        <p>Trigger a new build or reuse an existing cached build.</p>
+        <form method="post" action="{{ url_for('gui_builds_create') }}">
+            <input type="hidden" name="profile_id" value="{{ profile.profile_id }}">
+            
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" name="force_rebuild" value="true">
+                    Force rebuild (ignore cache)
+                </label>
+                <p class="form-help">Check this to force a new build even if a cached build exists.</p>
+            </div>
+            
+            <button type="submit" class="btn btn-primary">Build Image</button>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <h3>Packages</h3>
+    {% if profile.packages %}
+    <p><strong>Included:</strong></p>
+    <p>
+        {% for pkg in profile.packages %}
+        <code>{{ pkg }}</code>{% if not loop.last %}, {% endif %}
+        {% endfor %}
+    </p>
+    {% else %}
+    <p class="text-muted">No additional packages specified.</p>
+    {% endif %}
+    
+    {% if profile.packages_remove %}
+    <p><strong>Removed:</strong></p>
+    <p>
+        {% for pkg in profile.packages_remove %}
+        <code>-{{ pkg }}</code>{% if not loop.last %}, {% endif %}
+        {% endfor %}
+    </p>
+    {% endif %}
+</div>
+
+{% if profile.files %}
+<div class="card">
+    <h3>Files</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Path</th>
+                <th>Mode</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for file in profile.files %}
+            <tr>
+                <td><code>{{ file.path }}</code></td>
+                <td>{{ file.mode or '-' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+{% if builds %}
+<div class="card">
+    <h3>Recent Builds</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Build ID</th>
+                <th>Status</th>
+                <th>Cache Hit</th>
+                <th>Requested</th>
+                <th>Artifacts</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for build in builds %}
+            <tr>
+                <td>
+                    <a href="{{ url_for('gui_build_detail', build_id=build.id) }}">
+                        #{{ build.id }}
+                    </a>
+                </td>
+                <td>
+                    <span class="badge badge-{{ build.status }}">{{ build.status }}</span>
+                </td>
+                <td>{{ 'Yes' if build.is_cache_hit else 'No' }}</td>
+                <td>{{ build.requested_at.strftime('%Y-%m-%d %H:%M') if build.requested_at else '-' }}</td>
+                <td>{{ build.artifacts | length }}</td>
+                <td>
+                    <a href="{{ url_for('gui_build_detail', build_id=build.id) }}" class="btn btn-small btn-secondary">View</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="card">
+    <h3>Recent Builds</h3>
+    <p class="text-muted">No builds found for this profile.</p>
+</div>
+{% endif %}
+
+{% if profile.notes %}
+<div class="card">
+    <h3>Notes</h3>
+    <p>{{ profile.notes }}</p>
+</div>
+{% endif %}
+{% endblock %}

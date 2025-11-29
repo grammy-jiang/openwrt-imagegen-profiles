@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block title %}Builds - OpenWrt Image Generator{% endblock %}
+
+{% block content %}
+<h2>Builds</h2>
+
+<form class="filter-bar" method="get" action="{{ url_for('gui_builds_list') }}">
+    <div class="form-group">
+        <label for="status">Status</label>
+        <select id="status" name="status">
+            <option value="">All</option>
+            <option value="pending" {% if status == 'pending' %}selected{% endif %}>Pending</option>
+            <option value="running" {% if status == 'running' %}selected{% endif %}>Running</option>
+            <option value="succeeded" {% if status == 'succeeded' %}selected{% endif %}>Succeeded</option>
+            <option value="failed" {% if status == 'failed' %}selected{% endif %}>Failed</option>
+        </select>
+    </div>
+    
+    <div class="form-group">
+        <label for="profile">Profile</label>
+        <input type="text" id="profile" name="profile" value="{{ profile or '' }}" placeholder="Profile ID">
+    </div>
+    
+    <button type="submit" class="btn btn-primary">Filter</button>
+    {% if status or profile %}
+    <a href="{{ url_for('gui_builds_list') }}" class="btn btn-secondary">Clear</a>
+    {% endif %}
+</form>
+
+{% if builds %}
+<table>
+    <thead>
+        <tr>
+            <th>Build ID</th>
+            <th>Profile</th>
+            <th>Status</th>
+            <th>Cache Hit</th>
+            <th>Requested</th>
+            <th>Finished</th>
+            <th>Artifacts</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for build in builds %}
+        <tr>
+            <td>
+                <a href="{{ url_for('gui_build_detail', build_id=build.id) }}">
+                    #{{ build.id }}
+                </a>
+            </td>
+            <td>
+                {% if build.profile %}
+                <a href="{{ url_for('gui_profile_detail', profile_id=build.profile.profile_id) }}">
+                    {{ build.profile.profile_id }}
+                </a>
+                {% else %}
+                -
+                {% endif %}
+            </td>
+            <td>
+                <span class="badge badge-{{ build.status }}">{{ build.status }}</span>
+            </td>
+            <td>{{ 'Yes' if build.is_cache_hit else 'No' }}</td>
+            <td>{{ build.requested_at.strftime('%Y-%m-%d %H:%M') if build.requested_at else '-' }}</td>
+            <td>{{ build.finished_at.strftime('%Y-%m-%d %H:%M') if build.finished_at else '-' }}</td>
+            <td>{{ build.artifacts | length }}</td>
+            <td>
+                <a href="{{ url_for('gui_build_detail', build_id=build.id) }}" class="btn btn-small btn-secondary">View</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<div class="card">
+    <p class="text-muted text-center">No builds found{% if status or profile %} matching filters{% endif %}.</p>
+</div>
+{% endif %}
+{% endblock %}

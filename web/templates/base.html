@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}OpenWrt Image Generator{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='css/style.css') }}">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1><a href="{{ url_for('gui_dashboard') }}">OpenWrt Image Generator</a></h1>
+        </div>
+    </header>
+    
+    <nav>
+        <div class="container">
+            <ul>
+                <li><a href="{{ url_for('gui_dashboard') }}" {% if active_nav == 'dashboard' %}class="active"{% endif %}>Dashboard</a></li>
+                <li><a href="{{ url_for('gui_profiles_list') }}" {% if active_nav == 'profiles' %}class="active"{% endif %}>Profiles</a></li>
+                <li><a href="{{ url_for('gui_builds_list') }}" {% if active_nav == 'builds' %}class="active"{% endif %}>Builds</a></li>
+                <li><a href="{{ url_for('gui_flash_list') }}" {% if active_nav == 'flash' %}class="active"{% endif %}>Flash</a></li>
+            </ul>
+        </div>
+    </nav>
+    
+    <main>
+        <div class="container">
+            {% if error %}
+            <div class="alert alert-error">
+                <strong>Error:</strong> {{ error }}
+                {% if log_path %}
+                <br><a href="{{ log_path }}">View log file</a>
+                {% endif %}
+            </div>
+            {% endif %}
+            
+            {% if success %}
+            <div class="alert alert-success">
+                {{ success }}
+            </div>
+            {% endif %}
+            
+            {% if warning %}
+            <div class="alert alert-warning">
+                {{ warning }}
+            </div>
+            {% endif %}
+            
+            {% if info %}
+            <div class="alert alert-info">
+                {{ info }}
+            </div>
+            {% endif %}
+            
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+    
+    <footer>
+        <div class="container">
+            <p>OpenWrt Image Generator v{{ version }}</p>
+        </div>
+    </footer>
+    
+    <script src="{{ url_for('static', path='js/app.js') }}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - OpenWrt Image Generator{% endblock %}
+
+{% block content %}
+<h2>Dashboard</h2>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3>Quick Links</h3>
+        <ul>
+            <li><a href="{{ url_for('gui_profiles_list') }}">Manage Profiles</a> - View, edit, and organize device profiles</li>
+            <li><a href="{{ url_for('gui_builds_list') }}">Build History</a> - View build records and download artifacts</li>
+            <li><a href="{{ url_for('gui_flash_list') }}">Flash Records</a> - View flash operation history</li>
+            <li><a href="{{ url_for('gui_flash_wizard') }}">Flash Wizard</a> - Flash an image to a TF/SD card</li>
+        </ul>
+    </div>
+    
+    <div class="card">
+        <h3>System Status</h3>
+        <dl>
+            <dt>Version</dt>
+            <dd>{{ version }}</dd>
+            
+            <dt>Cache Directory</dt>
+            <dd><code>{{ config.cache_dir }}</code></dd>
+            
+            <dt>Artifacts Directory</dt>
+            <dd><code>{{ config.artifacts_dir }}</code></dd>
+            
+            <dt>Database</dt>
+            <dd><code>{{ config.db_url }}</code></dd>
+            
+            <dt>Offline Mode</dt>
+            <dd>{{ 'Yes' if config.offline else 'No' }}</dd>
+            
+            <dt>Log Level</dt>
+            <dd>{{ config.log_level }}</dd>
+        </dl>
+    </div>
+</div>
+
+<div class="grid grid-3">
+    <div class="card">
+        <h3>Profiles</h3>
+        <p class="text-muted">{{ profile_count }} profile{% if profile_count != 1 %}s{% endif %} registered</p>
+        <a href="{{ url_for('gui_profiles_list') }}" class="btn btn-primary">View Profiles</a>
+    </div>
+    
+    <div class="card">
+        <h3>Recent Builds</h3>
+        <p class="text-muted">{{ build_count }} build{% if build_count != 1 %}s{% endif %} recorded</p>
+        <a href="{{ url_for('gui_builds_list') }}" class="btn btn-primary">View Builds</a>
+    </div>
+    
+    <div class="card">
+        <h3>Flash Operations</h3>
+        <p class="text-muted">{{ flash_count }} flash record{% if flash_count != 1 %}s{% endif %}</p>
+        <a href="{{ url_for('gui_flash_list') }}" class="btn btn-primary">View Flash Records</a>
+    </div>
+</div>
+
+<div class="card mt-2">
+    <h3>Configuration Details</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Setting</th>
+                <th>Value</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Verification Mode</td>
+                <td>{{ config.verification_mode }}</td>
+            </tr>
+            <tr>
+                <td>Max Concurrent Downloads</td>
+                <td>{{ config.max_concurrent_downloads }}</td>
+            </tr>
+            <tr>
+                <td>Max Concurrent Builds</td>
+                <td>{{ config.max_concurrent_builds }}</td>
+            </tr>
+            <tr>
+                <td>Download Timeout</td>
+                <td>{{ config.download_timeout }}s</td>
+            </tr>
+            <tr>
+                <td>Build Timeout</td>
+                <td>{{ config.build_timeout }}s</td>
+            </tr>
+            <tr>
+                <td>Flash Timeout</td>
+                <td>{{ config.flash_timeout }}s</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+{% endblock %}

@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block title %}Flash Records - OpenWrt Image Generator{% endblock %}
+
+{% block content %}
+<h2>Flash Records</h2>
+
+<div class="actions-bar">
+    <a href="{{ url_for('gui_flash_wizard') }}" class="btn btn-warning">New Flash Operation</a>
+</div>
+
+<form class="filter-bar" method="get" action="{{ url_for('gui_flash_list') }}">
+    <div class="form-group">
+        <label for="status">Status</label>
+        <select id="status" name="status">
+            <option value="">All</option>
+            <option value="pending" {% if status == 'pending' %}selected{% endif %}>Pending</option>
+            <option value="running" {% if status == 'running' %}selected{% endif %}>Running</option>
+            <option value="succeeded" {% if status == 'succeeded' %}selected{% endif %}>Succeeded</option>
+            <option value="failed" {% if status == 'failed' %}selected{% endif %}>Failed</option>
+        </select>
+    </div>
+    
+    <div class="form-group">
+        <label for="device">Device Path</label>
+        <input type="text" id="device" name="device" value="{{ device or '' }}" placeholder="/dev/sdb">
+    </div>
+    
+    <button type="submit" class="btn btn-primary">Filter</button>
+    {% if status or device %}
+    <a href="{{ url_for('gui_flash_list') }}" class="btn btn-secondary">Clear</a>
+    {% endif %}
+</form>
+
+{% if records %}
+<table>
+    <thead>
+        <tr>
+            <th>Flash ID</th>
+            <th>Artifact</th>
+            <th>Device</th>
+            <th>Status</th>
+            <th>Verification</th>
+            <th>Requested</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for record in records %}
+        <tr>
+            <td>
+                <a href="{{ url_for('gui_flash_detail', flash_id=record.id) }}">
+                    #{{ record.id }}
+                </a>
+            </td>
+            <td>
+                {% if record.artifact %}
+                <code>{{ record.artifact.filename }}</code>
+                {% else %}
+                Artifact #{{ record.artifact_id }}
+                {% endif %}
+            </td>
+            <td><code>{{ record.device_path }}</code></td>
+            <td>
+                <span class="badge badge-{{ record.status }}">{{ record.status }}</span>
+            </td>
+            <td>{{ record.verification_result or '-' }}</td>
+            <td>{{ record.requested_at.strftime('%Y-%m-%d %H:%M') if record.requested_at else '-' }}</td>
+            <td>
+                <a href="{{ url_for('gui_flash_detail', flash_id=record.id) }}" class="btn btn-small btn-secondary">View</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<div class="card">
+    <p class="text-muted text-center">No flash records found{% if status or device %} matching filters{% endif %}.</p>
+</div>
+{% endif %}
+{% endblock %}

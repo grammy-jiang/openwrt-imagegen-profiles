@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+
+{% block title %}Flash #{{ record.id }} - OpenWrt Image Generator{% endblock %}
+
+{% block content %}
+<h2>Flash Record #{{ record.id }}</h2>
+
+<div class="actions-bar">
+    <a href="{{ url_for('gui_flash_list') }}" class="btn btn-secondary">← Back to List</a>
+    {% if record.build_id %}
+    <a href="{{ url_for('gui_build_detail', build_id=record.build_id) }}" class="btn btn-secondary">View Build</a>
+    {% endif %}
+    <a href="{{ url_for('gui_flash_wizard', artifact_id=record.artifact_id) }}" class="btn btn-warning">Flash Again</a>
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3>Flash Details</h3>
+        <dl>
+            <dt>Flash ID</dt>
+            <dd>#{{ record.id }}</dd>
+            
+            <dt>Artifact ID</dt>
+            <dd>
+                {% if record.artifact %}
+                <code>{{ record.artifact.filename }}</code> (ID: {{ record.artifact_id }})
+                {% else %}
+                #{{ record.artifact_id }}
+                {% endif %}
+            </dd>
+            
+            <dt>Build ID</dt>
+            <dd>
+                {% if record.build_id %}
+                <a href="{{ url_for('gui_build_detail', build_id=record.build_id) }}">#{{ record.build_id }}</a>
+                {% else %}
+                -
+                {% endif %}
+            </dd>
+            
+            <dt>Status</dt>
+            <dd><span class="badge badge-{{ record.status }}">{{ record.status }}</span></dd>
+            
+            <dt>Wiped Before Flash</dt>
+            <dd>{{ 'Yes' if record.wiped_before_flash else 'No' }}</dd>
+        </dl>
+    </div>
+    
+    <div class="card">
+        <h3>Device Information</h3>
+        <dl>
+            <dt>Device Path</dt>
+            <dd><code>{{ record.device_path }}</code></dd>
+            
+            <dt>Device Model</dt>
+            <dd>{{ record.device_model or '-' }}</dd>
+            
+            <dt>Device Serial</dt>
+            <dd>{{ record.device_serial or '-' }}</dd>
+        </dl>
+    </div>
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3>Verification</h3>
+        <dl>
+            <dt>Verification Mode</dt>
+            <dd>{{ record.verification_mode or '-' }}</dd>
+            
+            <dt>Verification Result</dt>
+            <dd>
+                {% if record.verification_result %}
+                {% if record.verification_result == 'match' %}
+                <span class="text-success">✓ Match</span>
+                {% elif record.verification_result == 'mismatch' %}
+                <span class="text-danger">✗ Mismatch</span>
+                {% elif record.verification_result == 'skipped' %}
+                <span class="text-muted">Skipped</span>
+                {% else %}
+                {{ record.verification_result }}
+                {% endif %}
+                {% else %}
+                -
+                {% endif %}
+            </dd>
+        </dl>
+    </div>
+    
+    <div class="card">
+        <h3>Timing</h3>
+        <dl>
+            <dt>Requested At</dt>
+            <dd>{{ record.requested_at.strftime('%Y-%m-%d %H:%M:%S') if record.requested_at else '-' }}</dd>
+            
+            <dt>Started At</dt>
+            <dd>{{ record.started_at.strftime('%Y-%m-%d %H:%M:%S') if record.started_at else '-' }}</dd>
+            
+            <dt>Finished At</dt>
+            <dd>{{ record.finished_at.strftime('%Y-%m-%d %H:%M:%S') if record.finished_at else '-' }}</dd>
+            
+            {% if record.started_at and record.finished_at %}
+            <dt>Duration</dt>
+            <dd>{{ (record.finished_at - record.started_at).total_seconds() | int }}s</dd>
+            {% endif %}
+        </dl>
+    </div>
+</div>
+
+{% if record.status == 'failed' %}
+<div class="card">
+    <h3>Error Details</h3>
+    <div class="alert alert-error">
+        {% if record.error_type %}
+        <strong>Error Type:</strong> {{ record.error_type }}<br>
+        {% endif %}
+        {% if record.error_message %}
+        <strong>Message:</strong> {{ record.error_message }}
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+{% if record.status == 'succeeded' %}
+<div class="card">
+    <h3>Post-Flash Steps</h3>
+    <ol>
+        <li><strong>Safely eject</strong> the TF/SD card from your computer</li>
+        <li><strong>Insert</strong> the card into your target device (router, SBC, etc.)</li>
+        <li><strong>Power on</strong> the device and wait for boot (may take 1-3 minutes)</li>
+        <li><strong>Connect</strong> via Ethernet or WiFi (default: 192.168.1.1)</li>
+        <li><strong>Verify</strong> the device is running the expected build:
+            <ul>
+                <li>Check <code>/etc/banner</code> or <code>/etc/openwrt_release</code></li>
+                <li>Verify expected packages are installed</li>
+            </ul>
+        </li>
+    </ol>
+</div>
+{% endif %}
+
+{% if record.log_path %}
+<div class="card">
+    <h3>Log File</h3>
+    <p><strong>Log Path:</strong> <code>{{ record.log_path }}</code></p>
+</div>
+{% endif %}
+{% endblock %}

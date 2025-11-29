@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+
+{% block title %}Build #{{ build.id }} - OpenWrt Image Generator{% endblock %}
+
+{% block content %}
+<h2>Build #{{ build.id }}</h2>
+
+<div class="actions-bar">
+    <a href="{{ url_for('gui_builds_list') }}" class="btn btn-secondary">← Back to List</a>
+    {% if build.profile %}
+    <a href="{{ url_for('gui_profile_detail', profile_id=build.profile.profile_id) }}" class="btn btn-secondary">View Profile</a>
+    {% endif %}
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3>Build Details</h3>
+        <dl>
+            <dt>Build ID</dt>
+            <dd>#{{ build.id }}</dd>
+            
+            <dt>Profile</dt>
+            <dd>
+                {% if build.profile %}
+                <a href="{{ url_for('gui_profile_detail', profile_id=build.profile.profile_id) }}">
+                    {{ build.profile.profile_id }}
+                </a>
+                {% else %}
+                -
+                {% endif %}
+            </dd>
+            
+            <dt>Status</dt>
+            <dd><span class="badge badge-{{ build.status }}">{{ build.status }}</span></dd>
+            
+            <dt>Cache Hit</dt>
+            <dd>{{ 'Yes' if build.is_cache_hit else 'No' }}</dd>
+            
+            <dt>Cache Key</dt>
+            <dd>
+                {% if build.cache_key %}
+                <code title="{{ build.cache_key }}">{{ build.cache_key[:32] }}...</code>
+                <button type="button" class="btn btn-small copy-btn" data-copy="{{ build.cache_key }}">Copy</button>
+                {% else %}
+                -
+                {% endif %}
+            </dd>
+        </dl>
+    </div>
+    
+    <div class="card">
+        <h3>Timing</h3>
+        <dl>
+            <dt>Requested At</dt>
+            <dd>{{ build.requested_at.strftime('%Y-%m-%d %H:%M:%S') if build.requested_at else '-' }}</dd>
+            
+            <dt>Started At</dt>
+            <dd>{{ build.started_at.strftime('%Y-%m-%d %H:%M:%S') if build.started_at else '-' }}</dd>
+            
+            <dt>Finished At</dt>
+            <dd>{{ build.finished_at.strftime('%Y-%m-%d %H:%M:%S') if build.finished_at else '-' }}</dd>
+            
+            {% if build.started_at and build.finished_at %}
+            <dt>Duration</dt>
+            <dd>{{ (build.finished_at - build.started_at).total_seconds() | int }}s</dd>
+            {% endif %}
+        </dl>
+    </div>
+</div>
+
+{% if build.status == 'failed' %}
+<div class="card">
+    <h3>Error Details</h3>
+    <div class="alert alert-error">
+        {% if build.error_type %}
+        <strong>Error Type:</strong> {{ build.error_type }}<br>
+        {% endif %}
+        {% if build.error_message %}
+        <strong>Message:</strong> {{ build.error_message }}
+        {% endif %}
+    </div>
+    {% if build.log_path %}
+    <p><strong>Log Path:</strong> <code>{{ build.log_path }}</code></p>
+    {% endif %}
+</div>
+{% endif %}
+
+{% if artifacts %}
+<div class="card">
+    <h3>Artifacts</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Filename</th>
+                <th>Type</th>
+                <th>Size</th>
+                <th>SHA256</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for artifact in artifacts %}
+            <tr>
+                <td><code>{{ artifact.filename }}</code></td>
+                <td>{{ artifact.kind }}</td>
+                <td>{{ "%.2f MB"|format(artifact.size_bytes / 1024 / 1024) if artifact.size_bytes else '-' }}</td>
+                <td>
+                    {% if artifact.sha256 %}
+                    <code title="{{ artifact.sha256 }}">{{ artifact.sha256[:16] }}...</code>
+                    <button type="button" class="btn btn-small copy-btn" data-copy="{{ artifact.sha256 }}">Copy</button>
+                    {% else %}
+                    -
+                    {% endif %}
+                </td>
+                <td>
+                    <a href="{{ url_for('gui_flash_wizard', artifact_id=artifact.id) }}" class="btn btn-small btn-warning">Flash</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="card">
+    <h3>Artifacts</h3>
+    <p class="text-muted">No artifacts available for this build.</p>
+</div>
+{% endif %}
+
+{% if build.log_path %}
+<div class="card">
+    <h3>Build Log</h3>
+    <p><strong>Log Path:</strong> <code>{{ build.log_path }}</code></p>
+</div>
+{% endif %}
+
+{% if build.input_snapshot %}
+<div class="card">
+    <h3>Build Inputs Snapshot</h3>
+    <pre><code>{{ build.input_snapshot | tojson(indent=2) }}</code></pre>
+</div>
+{% endif %}
+{% endblock %}
