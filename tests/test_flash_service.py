@@ -189,7 +189,7 @@ class TestFlashImage:
 
                     assert isinstance(result, FlashResult)
                     assert result.success is True
-                    assert "dry-run" in result.error_message.lower()
+                    assert "dry-run" in result.message.lower()
                     assert result.flash_record_id is None
             finally:
                 os.unlink(img.name)
@@ -329,7 +329,7 @@ class TestFlashArtifact:
                     )
 
                     assert result.success is True
-                    assert "dry-run" in result.error_message.lower()
+                    assert "dry-run" in result.message.lower()
             finally:
                 os.unlink(img.name)
 

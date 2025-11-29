@@ -199,6 +199,8 @@ def _write_with_progress(
         Number of bytes written.
     """
     bytes_written = 0
+    last_logged_mb = 0
+    log_interval_bytes = 10 * 1024 * 1024  # 10 MiB
 
     while bytes_written < total_bytes:
         chunk = source.read(block_size)
@@ -209,7 +211,8 @@ def _write_with_progress(
         bytes_written += len(chunk)
 
         # Log progress every 10 MiB
-        if bytes_written % (10 * 1024 * 1024) < block_size:
+        current_mb = bytes_written // log_interval_bytes
+        if current_mb > last_logged_mb:
             progress = (bytes_written / total_bytes) * 100
             logger.debug(
                 "Write progress: %d / %d bytes (%.1f%%)",
@@ -217,6 +220,7 @@ def _write_with_progress(
                 total_bytes,
                 progress,
             )
+            last_logged_mb = current_mb
 
     return bytes_written
 
@@ -430,7 +434,7 @@ def verify_device_hash(
         Tuple of (match: bool, actual_hash: str).
     """
     logger.info(
-        "Verifying %d bytes of %s against hash %s...",
+        "Verifying %d bytes of %s against hash %s... (hash truncated)",
         num_bytes,
         device_path,
         expected_hash[:16],

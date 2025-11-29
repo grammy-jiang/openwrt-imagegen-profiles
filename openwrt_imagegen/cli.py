@@ -833,6 +833,7 @@ def flash_write(
                     "device_hash": result.device_hash,
                     "verification_mode": result.verification_mode.value,
                     "verification_result": result.verification_result.value,
+                    "message": result.message,
                     "error_message": result.error_message,
                     "error_code": result.error_code,
                 }
@@ -950,6 +951,7 @@ def flash_image_cmd(
                 "device_hash": result.device_hash,
                 "verification_mode": result.verification_mode.value,
                 "verification_result": result.verification_result.value,
+                "message": result.message,
                 "error_message": result.error_message,
                 "error_code": result.error_code,
             }

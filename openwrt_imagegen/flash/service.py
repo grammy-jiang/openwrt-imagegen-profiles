@@ -122,6 +122,7 @@ class FlashResult:
         device_hash: SHA-256 hash read back from device.
         verification_mode: Verification mode used.
         verification_result: Result of hash verification.
+        message: Informational message (e.g., dry-run status).
         error_message: Error message if flash failed.
         error_code: Error code if flash failed.
     """
@@ -135,6 +136,7 @@ class FlashResult:
     device_hash: str | None
     verification_mode: VerificationMode
     verification_result: VerificationResult
+    message: str | None = None
     error_message: str | None = None
     error_code: str | None = None
 
@@ -348,7 +350,7 @@ def flash_image(
             device_hash=None,
             verification_mode=plan.verification_mode,
             verification_result=VerificationResult.SKIPPED,
-            error_message="Dry-run mode: no write performed",
+            message="Dry-run mode: no write performed",
         )
 
     # Create FlashRecord if session provided
