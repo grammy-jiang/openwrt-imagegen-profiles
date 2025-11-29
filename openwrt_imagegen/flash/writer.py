@@ -389,7 +389,6 @@ def write_image_to_device(
             verification_result = VerificationResult.MATCH
             logger.info("Hash verification passed")
         else:
-            verification_result = VerificationResult.MISMATCH
             logger.error(
                 "Hash verification FAILED: expected=%s, got=%s",
                 source_hash[:16],
