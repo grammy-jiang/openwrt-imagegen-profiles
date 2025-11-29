@@ -155,7 +155,26 @@ Keep the default install minimal (core runtime only). Use extras like `[dev]`, `
   uv run python -m openwrt_imagegen profiles validate profiles/home-ap-livingroom.yaml
   uv run python -m openwrt_imagegen profiles import profiles/
   uv run python -m openwrt_imagegen profiles list
+  uv run python -m openwrt_imagegen profiles list --json
   uv run python -m openwrt_imagegen profiles show <profile-id>
+  ```
+- Build commands:
+  ```
+  uv run python -m openwrt_imagegen build --help
+  uv run python -m openwrt_imagegen build list --json
+  uv run python -m openwrt_imagegen build batch --profile <profile-id> --json
+  ```
+- Artifact commands:
+  ```
+  uv run python -m openwrt_imagegen artifacts --help
+  uv run python -m openwrt_imagegen artifacts list --json
+  uv run python -m openwrt_imagegen artifacts list --build-id <build-id> --json
+  ```
+- Flash commands:
+  ```
+  uv run python -m openwrt_imagegen flash --help
+  uv run python -m openwrt_imagegen flash image <image-path> <device> --dry-run --force --json
+  uv run python -m openwrt_imagegen flash write <artifact-id> <device> --dry-run --force --json
   ```
 - Update lockfile:
   ```
