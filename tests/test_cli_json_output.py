@@ -141,6 +141,87 @@ packages:
             assert result.exit_code == 1
             assert "not found" in result.stdout.lower()
 
+    def test_profiles_list_with_filter_json(self, tmp_path: Path) -> None:
+        """profiles list --json with filters should return matching profiles."""
+        db_url = f"sqlite:///{tmp_path}/test.db"
+
+        # Create profile files
+        profile1 = tmp_path / "profile1.yaml"
+        profile1.write_text("""
+profile_id: test.filter.1
+name: Filter Test Profile 1
+device_id: filter-device
+openwrt_release: "23.05.2"
+target: ath79
+subtarget: generic
+imagebuilder_profile: tplink_archer-c6-v3
+tags:
+  - test
+  - wifi
+""")
+        profile2 = tmp_path / "profile2.yaml"
+        profile2.write_text("""
+profile_id: test.filter.2
+name: Filter Test Profile 2
+device_id: other-device
+openwrt_release: "22.03.5"
+target: ramips
+subtarget: mt7621
+imagebuilder_profile: xiaomi_mi-router-4a-gigabit
+tags:
+  - test
+  - router
+""")
+
+        with patch.dict("os.environ", {"OWRT_IMG_DB_URL": db_url}):
+            # Import profiles
+            runner.invoke(app, ["profiles", "import", str(profile1)])
+            runner.invoke(app, ["profiles", "import", str(profile2)])
+
+            # Filter by target
+            result = runner.invoke(
+                app, ["profiles", "list", "--target", "ath79", "--json"]
+            )
+            assert result.exit_code == 0
+            data = json.loads(result.stdout)
+            assert len(data) == 1
+            assert data[0]["profile_id"] == "test.filter.1"
+
+            # Filter by release
+            result = runner.invoke(
+                app, ["profiles", "list", "--release", "22.03.5", "--json"]
+            )
+            assert result.exit_code == 0
+            data = json.loads(result.stdout)
+            assert len(data) == 1
+            assert data[0]["profile_id"] == "test.filter.2"
+
+            # Filter by device ID
+            result = runner.invoke(
+                app, ["profiles", "list", "--device", "filter-device", "--json"]
+            )
+            assert result.exit_code == 0
+            data = json.loads(result.stdout)
+            assert len(data) == 1
+            assert data[0]["profile_id"] == "test.filter.1"
+
+            # Filter by subtarget
+            result = runner.invoke(
+                app, ["profiles", "list", "--subtarget", "mt7621", "--json"]
+            )
+            assert result.exit_code == 0
+            data = json.loads(result.stdout)
+            assert len(data) == 1
+            assert data[0]["profile_id"] == "test.filter.2"
+
+            # No matches
+            result = runner.invoke(
+                app, ["profiles", "list", "--target", "x86", "--json"]
+            )
+            assert result.exit_code == 0
+            data = json.loads(result.stdout)
+            assert data == []
+
 
 class TestBuildersJSONOutput:
     """Test JSON output for builders commands."""
@@ -283,6 +364,15 @@ class TestArtifactsJSONOutput:
             data = json.loads(result.stdout)
             assert data == []
 
+    def test_artifacts_show_not_found_json(self, tmp_path: Path) -> None:
+        """artifacts show should fail properly for missing artifact."""
+        db_url = f"sqlite:///{tmp_path}/test.db"
+
+        with patch.dict("os.environ", {"OWRT_IMG_DB_URL": db_url}):
+            result = runner.invoke(app, ["artifacts", "show", "999", "--json"])
+            assert result.exit_code == 1
+            assert "not found" in result.stdout.lower()
+
 
 class TestFlashJSONOutput:
     """Test JSON output for flash commands.
@@ -363,6 +453,27 @@ class TestFlashJSONOutput:
         # Should fail due to missing image file
         assert result.exit_code == 1
 
+    def test_flash_list_empty_json(self, tmp_path: Path) -> None:
+        """flash list --json should return [] when no flash records."""
+        db_url = f"sqlite:///{tmp_path}/test.db"
+
+        with patch.dict("os.environ", {"OWRT_IMG_DB_URL": db_url}):
+            result = runner.invoke(app, ["flash", "list", "--json"])
+            assert result.exit_code == 0
+            data = json.loads(result.stdout)
+            assert data == []
+
+    def test_flash_list_invalid_status(self, tmp_path: Path) -> None:
+        """flash list with invalid status should fail."""
+        db_url = f"sqlite:///{tmp_path}/test.db"
+
+        with patch.dict("os.environ", {"OWRT_IMG_DB_URL": db_url}):
+            result = runner.invoke(
+                app, ["flash", "list", "--status", "invalid", "--json"]
+            )
+            assert result.exit_code == 1
+            assert "invalid status" in result.stdout.lower()
+
 
 class TestJSONOutputConsistency:
     """Test that JSON outputs are consistent and parseable."""
@@ -411,6 +522,16 @@ class TestJSONOutputConsistency:
 
         with patch.dict("os.environ", {"OWRT_IMG_DB_URL": db_url}):
             result = runner.invoke(app, ["artifacts", "list", "--json"])
+            assert result.exit_code == 0
+            data = json.loads(result.stdout)
+            assert isinstance(data, list)
+
+    def test_flash_list_json_always_array(self, tmp_path: Path) -> None:
+        """flash list --json must always return an array."""
+        db_url = f"sqlite:///{tmp_path}/test.db"
+
+        with patch.dict("os.environ", {"OWRT_IMG_DB_URL": db_url}):
+            result = runner.invoke(app, ["flash", "list", "--json"])
             assert result.exit_code == 0
             data = json.loads(result.stdout)
             assert isinstance(data, list)

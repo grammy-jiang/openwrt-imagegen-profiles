@@ -129,6 +129,7 @@ The Python package and tooling are now available. Use these commands:
      uv run python -m openwrt_imagegen profiles import profiles/
      uv run python -m openwrt_imagegen profiles list
      uv run python -m openwrt_imagegen profiles list --json
+     uv run python -m openwrt_imagegen profiles list --target ath79 --release 23.05.2 --json
      uv run python -m openwrt_imagegen profiles show <profile-id>
      uv run python -m openwrt_imagegen profiles export /tmp/exports
      ```
@@ -138,12 +139,15 @@ The Python package and tooling are now available. Use these commands:
      uv run python -m openwrt_imagegen build batch --profile <profile-id> --json
      uv run python -m openwrt_imagegen artifacts list --json
      uv run python -m openwrt_imagegen artifacts list --build-id <build-id> --json
+     uv run python -m openwrt_imagegen artifacts show <artifact-id> --json
      ```
    - Flash commands:
      ```bash
      uv run python -m openwrt_imagegen flash --help
      uv run python -m openwrt_imagegen flash image <image-path> <device> --dry-run --force --json
      uv run python -m openwrt_imagegen flash write <artifact-id> <device> --dry-run --force --json
+     uv run python -m openwrt_imagegen flash list --json
+     uv run python -m openwrt_imagegen flash list --status succeeded --json
      ```
 
 6. Tox (optional, if introduced)
