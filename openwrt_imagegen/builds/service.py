@@ -550,6 +550,7 @@ class ProfileBuildResult:
                     "size_bytes": a.size_bytes,
                     "sha256": a.sha256,
                     "kind": a.kind,
+                    "labels": a.labels,
                 }
                 for a in self.artifacts
             ],
