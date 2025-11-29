@@ -61,9 +61,16 @@ This repository provides an opinionated Python library for managing OpenWrt Imag
    - Implement Typer-based CLI mapping to services (profiles, builders, builds, batch, artifacts, flash); support `--json`, exit codes per `OPERATIONS.md`, and config printing.  
    - Tests for argument parsing and JSON outputs.
 
-10. **Web API**  
-    - Build FastAPI app exposing endpoints per `FRONTENDS.md` (profiles, builders, builds, batch, artifacts, flash); reuse core services and schemas; enable polling endpoints for status/logs.  
-    - Tests with TestClient for happy/error paths.
+10. **Web API** ✅ (completed)
+    - Implemented FastAPI app in `web/` exposing endpoints per `FRONTENDS.md`:
+      - Health/root endpoints: `GET /health`, `GET /`
+      - Config: `GET /config`
+      - Profiles: `GET /profiles`, `GET /profiles/{id}`, `POST /profiles`, `PUT /profiles/{id}`, `DELETE /profiles/{id}`
+      - Builders: `GET /builders`, `GET /builders/{release}/{target}/{subtarget}`, `POST /builders/ensure`, `POST /builders/prune`, `GET /builders/info`
+      - Builds: `GET /builds`, `GET /builds/{id}`, `GET /builds/{id}/artifacts`, `POST /builds/batch`
+      - Flash: `GET /flash`, `POST /flash`
+    - Reuses core services and schemas; returns structured JSON with error codes.
+    - Tests with TestClient for happy and error paths in `tests/test_web_api.py`.
 
 11. **MCP server**  
     - Implement Starlette/FastAPI MCP tools (`list_profiles`, `build_image`, `build_images_batch`, `list_builds`, `list_artifacts`, `flash_artifact`); ensure idempotency, structured errors, and log path exposure.  
@@ -181,6 +188,11 @@ Keep the default install minimal (core runtime only). Use extras like `[dev]`, `
   uv run python -m openwrt_imagegen flash list --json
   uv run python -m openwrt_imagegen flash list --status succeeded --json
   ```
+- Web API server:
+  ```
+  uv run uvicorn web:app --reload --host 0.0.0.0 --port 8000
+  ```
+  Then access: `http://localhost:8000/docs` for OpenAPI documentation.
 - Update lockfile:
   ```
   uv lock

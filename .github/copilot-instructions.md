@@ -46,6 +46,10 @@ The package structure:
   - `builds/models.py`: BuildRecord and Artifact ORM models
   - `flash/models.py`: FlashRecord ORM model
   - `py.typed`: marker for typed package
+- `web/`: FastAPI web application
+  - `app.py`: FastAPI application factory
+  - `deps.py`: Database dependency injection
+  - `routers/`: API route handlers (health, config, profiles, builders, builds, flash)
 - `alembic/`: Database migration scripts
   - `env.py`: Alembic environment configuration
   - `versions/`: Migration files

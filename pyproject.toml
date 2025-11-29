@@ -94,9 +94,10 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["SIM117"]  # Allow nested with statements in tests for complex mocking
+"web/*" = ["B008"]  # Allow Depends() and Query() in FastAPI function defaults
 
 [tool.ruff.lint.isort]
-known-first-party = ["openwrt_imagegen"]
+known-first-party = ["openwrt_imagegen", "web"]
 
 [tool.mypy]
 python_version = "3.10"
