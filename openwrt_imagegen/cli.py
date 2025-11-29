@@ -762,13 +762,222 @@ def flash_write(
         bool,
         typer.Option("--force", "-f", help="Skip confirmation prompts"),
     ] = False,
+    wipe: Annotated[
+        bool,
+        typer.Option("--wipe", "-w", help="Wipe device before writing"),
+    ] = False,
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Output as JSON"),
+    ] = False,
 ) -> None:
-    """Flash an artifact to a TF/SD card."""
-    console.print(
-        f"[yellow]Not yet implemented: flash artifact {artifact_id} to {device} "
-        f"(dry_run={dry_run}, force={force})[/yellow]"
+    """Flash an artifact to a TF/SD card.
+
+    Requires explicit device path (e.g., /dev/sdb, /dev/mmcblk0).
+    Never operates on partitions (e.g., /dev/sdb1).
+
+    Use --dry-run to see what would happen without writing.
+    Use --force to skip confirmation prompts.
+    Use --wipe to clear existing signatures before writing.
+    """
+    from openwrt_imagegen.db import create_all_tables, get_engine, get_session_factory
+    from openwrt_imagegen.flash.service import (
+        ArtifactFileNotFoundError,
+        ArtifactNotFoundError,
+        flash_artifact,
     )
-    raise typer.Exit(code=1)
+
+    engine = get_engine()
+    create_all_tables(engine)
+    factory = get_session_factory(engine)
+
+    settings = get_settings()
+
+    # Confirmation prompt unless force or dry-run
+    if not force and not dry_run:
+        console.print(f"[bold red]WARNING:[/bold red] This will OVERWRITE {device}")
+        console.print(f"  Artifact ID: {artifact_id}")
+        if wipe:
+            console.print("  Device will be WIPED before writing")
+        confirm = typer.confirm("Are you sure you want to continue?", default=False)
+        if not confirm:
+            console.print("[yellow]Aborted[/yellow]")
+            raise typer.Exit(code=0)
+
+    with factory() as session:
+        try:
+            if dry_run:
+                console.print("[blue]Dry-run mode: validating without writing[/blue]")
+
+            result = flash_artifact(
+                session,
+                artifact_id=artifact_id,
+                device_path=device,
+                settings=settings,
+                wipe_before=wipe,
+                dry_run=dry_run,
+                force=force,
+            )
+
+            if not dry_run:
+                session.commit()
+
+            if json_output:
+                output = {
+                    "success": result.success,
+                    "flash_record_id": result.flash_record_id,
+                    "image_path": result.image_path,
+                    "device_path": result.device_path,
+                    "bytes_written": result.bytes_written,
+                    "source_hash": result.source_hash,
+                    "device_hash": result.device_hash,
+                    "verification_mode": result.verification_mode.value,
+                    "verification_result": result.verification_result.value,
+                    "message": result.message,
+                    "error_message": result.error_message,
+                    "error_code": result.error_code,
+                }
+                console.print(json.dumps(output, indent=2))
+            else:
+                if result.success:
+                    if dry_run:
+                        console.print("[green]✓ Dry-run validation passed[/green]")
+                        console.print(f"  Would write {result.bytes_written} bytes")
+                        console.print(f"  Image: {result.image_path}")
+                        console.print(f"  Device: {result.device_path}")
+                    else:
+                        console.print("[green]✓ Flash succeeded[/green]")
+                        console.print(f"  Bytes written: {result.bytes_written}")
+                        console.print(
+                            f"  Verification: {result.verification_result.value}"
+                        )
+                        if result.flash_record_id:
+                            console.print(f"  Record ID: {result.flash_record_id}")
+                else:
+                    console.print("[red]✗ Flash failed[/red]")
+                    if result.error_message:
+                        console.print(f"  Error: {result.error_message}")
+
+            if not result.success:
+                raise typer.Exit(code=1)
+
+        except ArtifactNotFoundError as e:
+            console.print(f"[red]Artifact not found: {e.artifact_id}[/red]")
+            raise typer.Exit(code=1) from None
+        except ArtifactFileNotFoundError as e:
+            console.print(f"[red]Artifact file not found: {e.path}[/red]")
+            raise typer.Exit(code=1) from None
+        except Exception as e:
+            console.print(f"[red]Flash failed: {e}[/red]")
+            raise typer.Exit(code=1) from None
+
+
+@flash_app.command("image")
+def flash_image_cmd(
+    image_path: Annotated[str, typer.Argument(help="Path to image file")],
+    device: Annotated[str, typer.Argument(help="Device path (e.g., /dev/sdX)")],
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", "-n", help="Show what would be done without writing"),
+    ] = False,
+    force: Annotated[
+        bool,
+        typer.Option("--force", "-f", help="Skip confirmation prompts"),
+    ] = False,
+    wipe: Annotated[
+        bool,
+        typer.Option("--wipe", "-w", help="Wipe device before writing"),
+    ] = False,
+    skip_verify: Annotated[
+        bool,
+        typer.Option("--skip-verify", help="Skip hash verification after write"),
+    ] = False,
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Output as JSON"),
+    ] = False,
+) -> None:
+    """Flash an image file to a TF/SD card.
+
+    This flashes a raw image file without database tracking.
+    Use 'flash write' to flash a tracked artifact instead.
+
+    Requires explicit device path (e.g., /dev/sdb, /dev/mmcblk0).
+    Never operates on partitions (e.g., /dev/sdb1).
+    """
+    from openwrt_imagegen.flash.service import flash_image
+    from openwrt_imagegen.types import VerificationMode
+
+    settings = get_settings()
+
+    verification_mode = (
+        VerificationMode.SKIP
+        if skip_verify
+        else VerificationMode(settings.verification_mode)
+    )
+
+    # Confirmation prompt unless force or dry-run
+    if not force and not dry_run:
+        console.print(f"[bold red]WARNING:[/bold red] This will OVERWRITE {device}")
+        console.print(f"  Image: {image_path}")
+        if wipe:
+            console.print("  Device will be WIPED before writing")
+        confirm = typer.confirm("Are you sure you want to continue?", default=False)
+        if not confirm:
+            console.print("[yellow]Aborted[/yellow]")
+            raise typer.Exit(code=0)
+
+    try:
+        if dry_run:
+            console.print("[blue]Dry-run mode: validating without writing[/blue]")
+
+        result = flash_image(
+            image_path,
+            device,
+            settings=settings,
+            wipe_before=wipe,
+            verification_mode=verification_mode,
+            dry_run=dry_run,
+            force=force,
+        )
+
+        if json_output:
+            output = {
+                "success": result.success,
+                "image_path": result.image_path,
+                "device_path": result.device_path,
+                "bytes_written": result.bytes_written,
+                "source_hash": result.source_hash,
+                "device_hash": result.device_hash,
+                "verification_mode": result.verification_mode.value,
+                "verification_result": result.verification_result.value,
+                "message": result.message,
+                "error_message": result.error_message,
+                "error_code": result.error_code,
+            }
+            console.print(json.dumps(output, indent=2))
+        else:
+            if result.success:
+                if dry_run:
+                    console.print("[green]✓ Dry-run validation passed[/green]")
+                    console.print(f"  Would write {result.bytes_written} bytes")
+                    console.print(f"  Image: {result.image_path}")
+                    console.print(f"  Device: {result.device_path}")
+                else:
+                    console.print("[green]✓ Flash succeeded[/green]")
+                    console.print(f"  Bytes written: {result.bytes_written}")
+                    console.print(f"  Verification: {result.verification_result.value}")
+            else:
+                console.print("[red]✗ Flash failed[/red]")
+                if result.error_message:
+                    console.print(f"  Error: {result.error_message}")
+
+        if not result.success:
+            raise typer.Exit(code=1)
+
+    except Exception as e:
+        console.print(f"[red]Flash failed: {e}[/red]")
+        raise typer.Exit(code=1) from None
 
 
 if __name__ == "__main__":

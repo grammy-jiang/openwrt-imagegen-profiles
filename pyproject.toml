@@ -92,6 +92,9 @@ ignore = [
     "E501",   # line too long (handled by formatter)
 ]
 
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["SIM117"]  # Allow nested with statements in tests for complex mocking
+
 [tool.ruff.lint.isort]
 known-first-party = ["openwrt_imagegen"]
 
