@@ -23,7 +23,7 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 from openwrt_imagegen.builds.models import Artifact
-from openwrt_imagegen.config import Settings
+from openwrt_imagegen.config import Settings, get_settings
 from openwrt_imagegen.flash.device import (
     DeviceInfo,
     DeviceValidationError,
@@ -31,6 +31,7 @@ from openwrt_imagegen.flash.device import (
 )
 from openwrt_imagegen.flash.models import FlashRecord
 from openwrt_imagegen.flash.writer import (
+    VERIFICATION_SIZE_BYTES,
     HashMismatchError,
     ImageNotFoundError,
     WriteError,
@@ -222,8 +223,6 @@ def plan_flash(
         image_hash, _ = compute_file_hash(image_path)
     else:
         # Prefix mode
-        from openwrt_imagegen.flash.writer import VERIFICATION_SIZE_BYTES
-
         verify_bytes = min(
             VERIFICATION_SIZE_BYTES.get(verification_mode, image_size), image_size
         )
@@ -293,8 +292,6 @@ def flash_image(
         WriteError: Write operation failed.
         HashMismatchError: Hash verification failed.
     """
-    from openwrt_imagegen.config import get_settings
-
     if settings is None:
         settings = get_settings()
 
@@ -471,8 +468,6 @@ def flash_artifact(
         DeviceValidationError: Device validation failed.
         WriteError: Write operation failed.
     """
-    from openwrt_imagegen.config import get_settings
-
     if settings is None:
         settings = get_settings()
 
