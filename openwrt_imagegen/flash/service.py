@@ -422,7 +422,7 @@ def flash_image(
             device_path=plan.device_path,
             bytes_written=0,
             source_hash=plan.image_hash,
-            device_hash=getattr(e, "actual_hash", None),
+            device_hash=e.actual_hash if isinstance(e, HashMismatchError) else None,
             verification_mode=verification_mode,
             verification_result=VerificationResult.MISMATCH
             if isinstance(e, HashMismatchError)
