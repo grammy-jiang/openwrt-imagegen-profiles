@@ -72,9 +72,17 @@ This repository provides an opinionated Python library for managing OpenWrt Imag
     - Reuses core services and schemas; returns structured JSON with error codes.
     - Tests with TestClient for happy and error paths in `tests/test_web_api.py`.
 
-11. **MCP server**  
-    - Implement Starlette/FastAPI MCP tools (`list_profiles`, `build_image`, `build_images_batch`, `list_builds`, `list_artifacts`, `flash_artifact`); ensure idempotency, structured errors, and log path exposure.  
-    - Tests for tool behaviors and error codes.
+11. **MCP server** ✅ (completed)
+    - Implemented FastMCP server in `mcp_server/` exposing tools per `FRONTENDS.md`:
+      - `list_profiles` - list profiles with optional filters
+      - `get_profile` - get profile details by ID
+      - `build_image` - build-or-reuse with idempotent semantics (returns cache_hit flag)
+      - `build_images_batch` - batch builds with fail-fast/best-effort modes
+      - `list_builds` - list build records with filters
+      - `list_artifacts` - list artifacts with filters
+      - `flash_artifact` - flash with safety checks (requires force=True for actual writes)
+    - Structured error responses with stable codes per `OPERATIONS.md` taxonomy.
+    - Tests for idempotency and error codes in `tests/test_mcp_tools.py`.
 
 12. **Docs & polish**  
     - Update `README.md`, `docs/DEVELOPMENT.md`, `.github/copilot-instructions.md` with actual commands and status.  
@@ -193,6 +201,15 @@ Keep the default install minimal (core runtime only). Use extras like `[dev]`, `
   uv run uvicorn web:app --reload --host 0.0.0.0 --port 8000
   ```
   Then access: `http://localhost:8000/docs` for OpenAPI documentation.
+- MCP server (for AI tools):
+  ```
+  uv pip install -e .[mcp]
+  ```
+  The MCP server can be imported and run via `mcp_server.mcp`. Tools exposed:
+  - `list_profiles`, `get_profile`: Profile queries
+  - `build_image`, `build_images_batch`: Build operations with idempotent (cache-aware) semantics
+  - `list_builds`, `list_artifacts`: Build/artifact queries
+  - `flash_artifact`: Flash operations (requires `force=True` for actual writes)
 - Update lockfile:
   ```
   uv lock

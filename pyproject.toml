@@ -60,6 +60,9 @@ postgres = [
 ops = [
     "pyudev>=0.24",
 ]
+mcp = [
+    "mcp>=1.0",
+]
 
 [project.scripts]
 imagegen = "openwrt_imagegen.cli:app"
@@ -69,12 +72,12 @@ Repository = "https://github.com/grammy-jiang/openwrt-imagegen-profiles"
 Documentation = "https://github.com/grammy-jiang/openwrt-imagegen-profiles/tree/main/docs"
 
 [tool.hatch.build.targets.wheel]
-packages = ["openwrt_imagegen"]
+packages = ["openwrt_imagegen", "mcp_server"]
 
 [tool.ruff]
 target-version = "py310"
 line-length = 88
-src = ["openwrt_imagegen", "tests"]
+src = ["openwrt_imagegen", "mcp_server", "tests"]
 
 [tool.ruff.lint]
 select = [
@@ -93,11 +96,12 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["SIM117"]  # Allow nested with statements in tests for complex mocking
+"tests/*" = ["SIM117", "ARG002"]  # Allow nested with statements and unused arguments in tests
+"mcp_server/*" = ["B008"]  # Allow Depends() and Field() in FastMCP tool defaults
 "web/*" = ["B008"]  # Allow Depends() and Query() in FastAPI function defaults
 
 [tool.ruff.lint.isort]
-known-first-party = ["openwrt_imagegen", "web"]
+known-first-party = ["openwrt_imagegen", "mcp_server", "web"]
 
 [tool.mypy]
 python_version = "3.10"
@@ -117,6 +121,10 @@ plugins = ["pydantic.mypy"]
 [[tool.mypy.overrides]]
 module = "tests.*"
 disallow_untyped_defs = false
+
+[[tool.mypy.overrides]]
+module = "mcp_server.*"
+disallow_untyped_decorators = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
