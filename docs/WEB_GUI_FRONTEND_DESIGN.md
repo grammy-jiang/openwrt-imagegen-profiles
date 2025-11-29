@@ -115,6 +115,14 @@ In `web/app.py`:
 
 All GUI routes will then be available at `/ui/...`.
 
+### 2.3. How GUI routes call backend logic
+
+GUI handlers should **prefer calling core `openwrt_imagegen` services
+directly** (via shared dependencies like `get_db_session` and
+`get_settings`) rather than HTTP-calling the JSON endpoints. The JSON routers
+and GUI therefore remain thin, parallel adapters over the same underlying
+service functions.
+
 ---
 
 ## 3. Route map
@@ -662,22 +670,27 @@ No external JS libraries are required.
 The GUI depends solely on existing core services and APIs:
 
 - Profiles
-  - `profiles_service.list_profiles`
-  - `profiles_service.get_profile`
+  - `profiles_service.list_profiles(...)` – used by `/ui/profiles`.
+  - `profiles_service.get_profile(...)` – used by `/ui/profiles/{profile_id}`.
 - Builds
-  - `builds_service.build_or_reuse`
-  - `builds_service.list_builds`
-  - `builds_service.get_build`
-  - `builds_service.list_artifacts`
-  - `builds_service.get_artifact`
+  - `builds_service.build_or_reuse(...)` – used by `POST /ui/builds`.
+  - `builds_service.list_builds(...)` – used by `/ui/builds` and the
+    "recent builds" section of `/ui/profiles/{profile_id}`.
+  - `builds_service.get_build(...)` – used by `/ui/builds/{build_id}`.
+  - `builds_service.list_artifacts(...)` – used by `/ui/builds/{build_id}`.
+  - `builds_service.get_artifact(...)` – used by `/ui/flash/new` when
+    `artifact_id` is provided.
 - Flash
-  - `flash_service.list_flash_records`
-  - `flash_service.flash_artifact`
-  - `flash_service.get_flash_record`
+  - `flash_service.list_flash_records(...)` – used by `/ui/flash`.
+  - `flash_service.flash_artifact(...)` – used by `POST /ui/flash`.
+  - `flash_service.get_flash_record(...)` – used by `/ui/flash/{flash_id}`.
 - Config / health
   - `get_settings()` (and/or health endpoints) for dashboard info.
 
-The GUI must stick to these and must not reimplement any underlying logic.
+All `/ui` routes use the same `get_db_session()` and `get_settings()`
+dependencies as the JSON routers; the GUI does **not** create its own
+database engines or sessions. The GUI must stick to these services and must
+not reimplement any underlying build/flash logic.
 
 ---
 
