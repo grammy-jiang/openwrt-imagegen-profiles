@@ -205,7 +205,12 @@ def plan_flash(
 
     Raises:
         ImageNotFoundError: Image file not found.
-        DeviceValidationError: Device validation failed.
+        DeviceNotFoundError: Device not found (subclass of DeviceValidationError).
+        NotBlockDeviceError: Device is not a block device (subclass of DeviceValidationError).
+        PartitionDeviceError: Device is a partition, not a whole device (subclass of DeviceValidationError).
+        SystemDeviceError: Device is a system/root device (subclass of DeviceValidationError).
+        DeviceMountedError: Device is currently mounted (subclass of DeviceValidationError).
+        DeviceValidationError: Other device validation errors (base class for the above).
     """
     image_path = Path(image_path)
 
