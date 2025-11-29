@@ -80,6 +80,13 @@ class BuildDefaults(TypedDict, total=False):
     keep_build_dir: bool
 
 
+class BatchMode(str, Enum):
+    """Mode for batch operations."""
+
+    FAIL_FAST = "fail-fast"
+    BEST_EFFORT = "best-effort"
+
+
 @dataclass
 class OperationResult:
     """Result of an operation (build, flash, etc.)."""
@@ -105,6 +112,7 @@ class ArtifactInfo:
 
 __all__ = [
     "ArtifactInfo",
+    "BatchMode",
     "BuildDefaults",
     "BuildStatus",
     "FileSpec",

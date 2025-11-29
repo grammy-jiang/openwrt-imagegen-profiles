@@ -2,6 +2,7 @@
 
 from openwrt_imagegen.types import (
     ArtifactInfo,
+    BatchMode,
     BuildDefaults,
     BuildStatus,
     FileSpec,
@@ -49,6 +50,11 @@ class TestEnums:
         assert VerificationResult.MATCH.value == "match"
         assert VerificationResult.MISMATCH.value == "mismatch"
         assert VerificationResult.SKIPPED.value == "skipped"
+
+    def test_batch_mode_values(self) -> None:
+        """BatchMode should have expected values."""
+        assert BatchMode.FAIL_FAST.value == "fail-fast"
+        assert BatchMode.BEST_EFFORT.value == "best-effort"
 
 
 class TestDataclasses:
